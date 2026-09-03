@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标准物质领用记录</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    body { background:#f0f4f8; padding:20px; color:#0f172a; }
+    .app-container { display:flex; gap:20px; max-width:1600px; margin:0 auto; min-height:85vh; align-items:flex-start; }
+
+    /* 左侧可折叠面板 */
+    .side-panel { transition:all .25s ease; background:#fff; border-radius:28px; box-shadow:0 10px 25px -5px rgba(0,0,0,.05),0 8px 10px -6px rgba(0,0,0,.02); overflow:hidden; display:flex; height:fit-content; max-height:88vh; flex-shrink:0; }
+    .side-panel.collapsed { width:48px; min-width:48px; }
+    .side-panel.expanded { width:400px; min-width:340px; }
+    .collapse-handle { width:48px; min-width:48px; background:linear-gradient(145deg,#f8fafc,#eef2f6); writing-mode:vertical-rl; text-orientation:mixed; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:.9rem; color:#2c3e66; letter-spacing:4px; cursor:pointer; user-select:none; border-right:1px solid #e2e8f0; transition:.2s; }
+    .collapse-handle:hover { background:#e6edf4; color:#1e40af; }
+    .panel-content { flex:1; padding:20px 16px; overflow-y:auto; }
+    .panel-content h3 { font-size:1.15rem; font-weight:600; color:#1e293b; border-left:4px solid #3b82f6; padding-left:12px; margin-bottom:16px; }
+    .list-table { width:100%; font-size:.78rem; border-collapse:collapse; }
+    .list-table th, .list-table td { padding:8px 6px; border-bottom:1px solid #e2e8f0; text-align:left; }
+    .list-table th { background:#f8fafc; font-weight:600; color:#334155; position:sticky; top:0; }
+
+    .main-content { flex:1; min-width:0; background:#fff; border-radius:28px; box-shadow:0 10px 25px -5px rgba(0,0,0,.05); padding:20px 28px 28px; overflow-x:auto; }
+
+    .alert-bar { background:#fff7ed; border-radius:60px; padding:10px 20px; margin-bottom:22px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; border-left:5px solid #f97316; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .alert-bar .grp { display:flex; align-items:center; gap:8px; font-size:.85rem; color:#7c2d12; }
+    .alert-num { font-weight:800; font-size:1.5rem; color:#c2410c; margin-right:4px; }
+    .blink { animation:blinkWarning .8s ease-in-out infinite; font-weight:700; border-radius:32px; padding:4px 12px; background:#fff1f0; color:#b91c1c; }
+    @keyframes blinkWarning { 0%,100%{opacity:1;background:#fff1f0;color:#b91c1c} 50%{opacity:.55;background:#ffc4c4;color:#7f1a1a} }
+    .conn-dot { width:9px; height:9px; border-radius:50%; background:#cbd5e1; display:inline-block; margin-right:6px; }
+    .conn-dot.live { background:#16a34a; }
+    .conn-dot.err { background:#dc2626; }
+    .conn-txt { font-size:.78rem; color:#475569; }
+
+    .card { background:#fff; border-radius:24px; padding:20px; margin-bottom:26px; box-shadow:0 1px 3px rgba(0,0,0,.05); border:1px solid #edf2f7; }
+    .card-title { font-size:1.2rem; font-weight:600; margin-bottom:16px; color:#0f172a; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .collapse-btn { background:none; border:none; font-size:1.05rem; cursor:pointer; padding:2px 9px; color:#475569; transition:.2s; border-radius:40px; }
+    .collapse-btn:hover { background:#eef2ff; color:#1e40af; }
+    .title-actions { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+
+    .form-row { display:flex; flex-wrap:wrap; gap:18px; margin-bottom:16px; align-items:flex-end; }
+    .form-group { flex:1; min-width:170px; }
+    .form-group label { font-size:.72rem; font-weight:600; text-transform:uppercase; color:#475569; display:block; margin-bottom:6px; letter-spacing:.3px; }
+    input, select, textarea { width:100%; padding:10px 12px; border-radius:16px; border:1px solid #cbd5e1; background:#fefefe; transition:.2s; font-size:.88rem; font-family:inherit; color:inherit; }
+    input:focus, select:focus, textarea:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.2); }
+    button { background:#3b82f6; border:none; padding:10px 20px; border-radius:40px; font-weight:600; color:#fff; cursor:pointer; transition:.15s; font-size:.83rem; font-family:inherit; }
+    button:hover { background:#2563eb; transform:translateY(-1px); }
+    .btn-sm { padding:5px 12px; font-size:.72rem; font-weight:600; }
+    .btn-green { background:#16a34a; } .btn-green:hover { background:#15803d; }
+    .btn-blue { background:#eef2ff; color:#1e40af; } .btn-blue:hover { background:#e0e7ff; transform:none; }
+    .btn-red { background:#fee2e2; color:#b91c1c; } .btn-red:hover { background:#fecaca; transform:none; }
+    .btn-dark { background:#2d3e5f; } .btn-dark:hover { background:#1e2a44; }
+    .btn-icon { background:none; border:none; cursor:pointer; font-size:.95rem; padding:3px 8px; border-radius:8px; transition:.1s; }
+    .btn-icon:hover { background:#eef2ff; }
+    .btn-icon.danger:hover { background:#fee2e2; }
+
+    table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    th, td { padding:11px 9px; text-align:left; border-bottom:1px solid #eef2ff; vertical-align:middle; }
+    th { background:#f8fafc; font-weight:600; color:#334155; white-space:nowrap; }
+    tbody tr:hover { background:#fafcff; }
+    .row-unreturn { background:#fff5f5 !important; }
+    .row-unreturn:hover { background:#ffecec !important; }
+    .row-expired { background:#fef2f2 !important; }
+    .row-soon { background:#fffbeb !important; }
+    .muted { color:#94a3b8; }
+    .mono { font-variant-numeric:tabular-nums; }
+
+    .badge { font-size:.7rem; padding:2px 9px; border-radius:40px; display:inline-block; font-weight:600; white-space:nowrap; }
+    .b-available { background:#dcfce7; color:#15803d; }
+    .b-borrowed { background:#fee2e2; color:#b91c1c; }
+    .b-expired { background:#7f1d1d; color:#fee2e2; }
+    .b-soon { background:#fef3c7; color:#92400e; }
+    .b-ok { background:#f1f5f9; color:#475569; }
+
+    .empty-tip { text-align:center; color:#94a3b8; padding:22px; font-size:.85rem; }
+
+    dialog { border:none; border-radius:28px; padding:0; box-shadow:0 20px 45px -10px rgba(0,0,0,.25); max-width:560px; width:calc(100% - 32px); color:#0f172a; }
+    dialog::backdrop { background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
+    .dlg-h { padding:20px 24px 0; font-weight:600; font-size:1.1rem; }
+    .dlg-b { padding:14px 24px 6px; }
+    .dlg-f { padding:14px 24px 20px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+    .hint { font-size:.76rem; color:#64748b; line-height:1.7; }
+    details { margin-top:10px; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px; background:#fafcfe; }
+    summary { cursor:pointer; font-size:.8rem; font-weight:600; color:#1e40af; }
+    pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:12px; overflow:auto; font-size:.72rem; line-height:1.6; margin:9px 0 0; max-height:220px; }
+
+    .toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,20px); z-index:1000; background:#111827; color:#fff; padding:10px 18px; border-radius:40px; font-size:.85rem; opacity:0; transition:.22s; pointer-events:none; }
+    .toast.show { opacity:1; transform:translate(-50%,0); }
+    .footer-note { margin-top:24px; text-align:center; font-size:.7rem; color:#6c757d; border-top:1px solid #e2e8f0; padding-top:18px; line-height:1.8; }
+    @media(max-width:900px){ .app-container{flex-direction:column} .side-panel.expanded{width:100%} .side-panel{max-height:none} }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 左侧：标准物质清单 -->
+    <div class="side-panel collapsed" id="sidePanel">
+        <div class="collapse-handle" id="collapseToggle">🧪 物质清单</div>
+        <div class="panel-content" id="panelContent" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+                <h3>📦 标准物质台账</h3>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button id="newItemBtn" class="btn-sm btn-green">➕ 新建</button>
+                    <button id="importItemBtn" class="btn-sm btn-blue">📂 导入</button>
+                    <button id="batchDelBtn" class="btn-sm btn-red">🗑️ 批量删除</button>
+                </div>
+            </div>
+            <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none;">
+            <input type="text" id="panelSearch" placeholder="🔍 搜索编号 / 名称 / GBW / 批号" style="margin-bottom:10px; padding:8px 12px; font-size:.8rem;">
+            <div style="max-height:62vh; overflow-y:auto;">
+                <table class="list-table">
+                    <thead><tr>
+                        <th style="width:28px"><input type="checkbox" id="selAll"></th>
+                        <th>编号</th><th>名称</th><th>有效期</th><th>状态</th><th style="width:44px">操作</th>
+                    </tr></thead>
+                    <tbody id="panelTbody"></tbody>
+                </table>
+            </div>
+            <div style="margin-top:12px;"><button id="exportItemBtn" class="btn-sm btn-dark" style="width:100%;">📎 导出台账 Excel</button></div>
+        </div>
+    </div>
+
+    <!-- 主区 -->
+    <div class="main-content">
+        <div class="alert-bar">
+            <div class="grp">🔔 <strong>提醒</strong></div>
+            <div class="grp"><span id="unreturnNum" class="alert-num">0</span> <span id="blinkWrap"><span class="blink">项尚未归还</span></span></div>
+            <div class="grp">⚠️ <span id="expiryTxt">—</span></div>
+            <div class="grp" style="margin-left:auto;"><span id="connDot" class="conn-dot"></span><span id="connTxt" class="conn-txt">—</span>
+                <button id="shareBtn" class="btn-sm btn-green">🔗 分享链接</button>
+                <button id="syncBtn" class="btn-sm btn-blue">☁️ 云同步</button>
+                <button id="nameBtn" class="btn-sm btn-blue">👤 我是谁</button>
+            </div>
+        </div>
+
+        <!-- 领用登记 -->
+        <div class="card">
+            <div class="card-title">📝 领用登记</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2"><label>🔍 搜索标准物质</label><input type="text" id="searchInput" placeholder="输入编号、名称、GBW 号或批号…"></div>
+                <div class="form-group" style="flex:3"><label>🧪 选择标准物质</label><select id="itemSelect" size="1"></select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>🧑‍💼 领用人</label>
+                    <input list="staffList" id="borrowerInput" placeholder="选择或自由输入">
+                    <datalist id="staffList">
+                        <option>曹问宇</option><option>高曼</option><option>刘天润</option><option>满袁志</option><option>史鹏程</option><option>石潇怿</option><option>王超</option><option>王汉斌</option><option>武誉丰</option><option>张鋆平</option><option>周阳超</option>
+                    </datalist>
+                </div>
+                <div class="form-group" style="flex:2"><label>📋 用途 / 备注</label><input type="text" id="remarkInput" placeholder="例：HJ 636 水质总氮测定，预计下周三归还"></div>
+                <div class="form-group" style="flex:0 0 auto; min-width:130px;"><button id="borrowBtn" style="width:100%;">✅ 确认领用</button></div>
+            </div>
+        </div>
+
+        <!-- 未归还 -->
+        <div class="card">
+            <div class="card-title">⏳ 未归还清单 <span id="unreturnBadge" class="badge b-borrowed">0</span></div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead><tr><th>状态</th><th>编号</th><th>名称 / 标准值</th><th>批号</th><th>领用人</th><th>用途</th><th>领用时间</th><th>操作</th></tr></thead>
+                    <tbody id="unreturnTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 有效期预警 -->
+        <div class="card">
+            <div class="card-title">🗓️ 有效期预警 <button id="toggleExpiryBtn" class="collapse-btn" title="展开">▶</button>
+                <span class="hint" style="margin-left:6px; font-weight:400;">已过期与 60 天内到期</span></div>
+            <div id="expiryBox" style="display:none; overflow-x:auto;">
+                <table>
+                    <thead><tr><th>状态</th><th>编号</th><th>名称</th><th>批号</th><th>有效期</th><th>剩余</th><th>存放位置</th><th>当前</th></tr></thead>
+                    <tbody id="expiryTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 领用归还记录 -->
+        <div class="card">
+            <div class="card-title">📜 领用 / 归还记录 <button id="toggleHistoryBtn" class="collapse-btn" title="展开">▶</button>
+                <div class="title-actions">
+                    <input type="text" id="histSearch" placeholder="🔍 过滤：编号/名称/领用人" style="width:230px; padding:7px 12px; font-size:.78rem;">
+                    <button id="exportRecBtn" class="btn-sm btn-dark">📎 导出记录 Excel</button>
+                </div>
+            </div>
+            <div id="historyBox" style="display:none; overflow-x:auto;">
+                <table>
+                    <thead><tr><th>编号</th><th>名称 / 标准值</th><th>批号</th><th>领用人</th><th>领用时间</th><th>归还时间</th><th>归还余量</th><th>用途</th></tr></thead>
+                    <tbody id="historyTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            🧪 标准物质领用记录 · 借用型流程：领用 → 未归还 → 归还（填写余量百分比）→ 归档<br>
+            ⚙️ 数据实时云端同步 | 无云配置时自动存本机 | 删除与导入需密码(114514) | 导入 Excel 需含「编号、名称」列，其余列智能识别
+        </div>
+    </div>
+</div>
+
+<!-- 新建/编辑 -->
+<dialog id="itemDlg">
+    <div class="dlg-h" id="itemDlgTitle">➕ 新建标准物质</div>
+    <div class="dlg-b">
+        <input type="hidden" id="f_id">
+        <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group"><label>编号</label><input id="f_code" placeholder="CRM-001"></div>
+            <div class="form-group"><label>批号</label><input id="f_batch" placeholder="20240315"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group" style="flex:2"><label>标准物质名称</label><input id="f_name" placeholder="水中铅成分分析标准物质"></div>
+            <div class="form-group"><label>GBW 号</label><input id="f_gbwno" placeholder="GBW(E)080215"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group"><label>标准值 / 浓度</label><input id="f_value" placeholder="100 μg/mL"></div>
+            <div class="form-group"><label>不确定度 (k=2)</label><input id="f_uncert" placeholder="1%"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group"><label>规格 / 包装</label><input id="f_spec" placeholder="20 mL 安瓿"></div>
+            <div class="form-group"><label>有效期</label><input type="date" id="f_expiry"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:4px;">
+            <div class="form-group"><label>存放位置</label><input id="f_location" placeholder="标物柜 A-2"></div>
+            <div class="form-group"><label>当前余量 %</label><input type="number" id="f_amount" min="0" max="100" step="1" value="100"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:2px;">
+            <div class="form-group"><label>备注</label><input id="f_note" placeholder="开封后需冷藏 / 避光"></div>
+        </div>
+    </div>
+    <div class="dlg-f">
+        <button type="button" class="btn-sm btn-red" id="deleteItemBtn" style="display:none;">🗑️ 删除此项</button>
+        <button type="button" class="btn-sm btn-blue" id="cancelItemBtn">取消</button>
+        <button type="button" id="saveItemBtn">💾 保存</button>
+    </div>
+</dialog>
+
+<!-- 归还 -->
+<dialog id="returnDlg">
+    <div class="dlg-h">📥 归还登记</div>
+    <div class="dlg-b">
+        <div class="hint" id="returnInfo" style="margin-bottom:12px;"></div>
+        <input type="hidden" id="r_id">
+        <div class="form-row" style="margin-bottom:6px;">
+            <div class="form-group"><label>归还时余量 %</label><input type="number" id="r_remain" min="0" max="100" step="1" value="100"></div>
+            <div class="form-group" style="flex:2"><label>归还备注（可选）</label><input id="r_note" placeholder="例：剩余约三分之二，已密封冷藏"></div>
+        </div>
+    </div>
+    <div class="dlg-f">
+        <button type="button" class="btn-sm btn-blue" id="cancelReturnBtn">取消</button>
+        <button type="button" class="btn-green" id="confirmReturnBtn">✅ 确认归还</button>
+    </div>
+</dialog>
+
+<!-- 云同步设置 -->
+<dialog id="syncDlg">
+    <div class="dlg-h">☁️ 云同步设置（Supabase）</div>
+    <div class="dlg-b">
+        <div class="form-row" style="margin-bottom:12px;">
+            <div class="form-group"><label>Project URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co"></div>
+        </div>
+        <div class="form-row" style="margin-bottom:6px;">
+            <div class="form-group"><label>anon / publishable key</label><input id="cfgKey" placeholder="eyJ... 或 sb_publishable_..."></div>
+        </div>
+        <div class="hint">留空则只存在本机浏览器。填好并建表后，全组共用一份台账，任何人的领用与归还都会实时同步。</div>
+        <details>
+            <summary>建表 SQL（Supabase → SQL Editor → New query → Run）</summary>
+            <pre id="sqlBox"></pre>
+            <div style="margin-top:8px"><button type="button" class="btn-sm btn-blue" id="copySqlBtn">复制 SQL</button></div>
+        </details>
+    </div>
+    <div class="dlg-f">
+        <button type="button" class="btn-sm btn-red" id="clearCfgBtn">清除配置</button>
+        <button type="button" class="btn-sm btn-blue" id="testCfgBtn">测试连接</button>
+        <button type="button" id="saveCfgBtn">💾 保存并连接</button>
+    </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+/* ================= 常量 ================= */
+const T_ITEM = 'crm_items';
+const T_LOAN = 'crm_loans';
+const LS_CFG = 'wbCrm.cfg.v1';
+const LS_ME  = 'wbCrm.me.v1';
+const LS_ITEMS = 'wbCrm.items.v1';
+const LS_LOANS = 'wbCrm.loans.v1';
+const PWD = '114514';
+const SOON_DAYS = 60;
+
+const SQL = `create table if not exists crm_items (
+  id text primary key,
+  code text not null,
+  name text not null,
+  gbwno text,
+  batch text,
+  spec text,
+  value text,
+  uncert text,
+  expiry date,
+  location text,
+  amount numeric default 100,
+  note text,
+  sort bigint default 0
+);
+create table if not exists crm_loans (
+  id text primary key,
+  item_id text,
+  code text,
+  name text,
+  batch text,
+  borrower text,
+  borrow_at timestamptz,
+  remark text,
+  return_at timestamptz,
+  remain numeric,
+  return_note text
+);
+
+alter table crm_items enable row level security;
+alter table crm_loans enable row level security;
+drop policy if exists crm_items_all on crm_items;
+create policy crm_items_all on crm_items for all using (true) with check (true);
+drop policy if exists crm_loans_all on crm_loans;
+create policy crm_loans_all on crm_loans for all using (true) with check (true);
+
+do $$ begin alter publication supabase_realtime add table crm_items; exception when others then null; end $$;
+do $$ begin alter publication supabase_realtime add table crm_loans; exception when others then null; end $$;`;
+
+const DEMO_ITEMS = [
+  { code:'CRM-001', name:'水中铅成分分析标准物质', gbwno:'GBW(E)080215', batch:'240315', spec:'20 mL 安瓿', value:'100 μg/mL', uncert:'1%', expiry:'2027-03-14', location:'标物柜 A-2', amount:100, note:'避光冷藏' },
+  { code:'CRM-002', name:'水中砷成分分析标准物质', gbwno:'GBW(E)080195', batch:'231108', spec:'20 mL 安瓿', value:'100 μg/mL', uncert:'1%', expiry:'2026-11-07', location:'标物柜 A-2', amount:100, note:'' },
+  { code:'CRM-003', name:'邻苯二甲酸氢钾纯度标准物质', gbwno:'GBW06106', batch:'220601', spec:'50 g 瓶', value:'99.99%', uncert:'0.02%', expiry:'2028-05-31', location:'干燥器 B-1', amount:100, note:'容量基准' },
+  { code:'CRM-004', name:'水中总氮标准溶液', gbwno:'GBW(E)082267', batch:'240902', spec:'50 mL 瓶', value:'1000 μg/mL', uncert:'0.8%', expiry:'2026-09-25', location:'冰箱 4℃ C-3', amount:100, note:'临期关注' },
+  { code:'CRM-005', name:'空气中甲烷标准气体', gbwno:'GBW(E)063631', batch:'230420', spec:'4 L 气瓶', value:'50.0 μmol/mol', uncert:'1.5%', expiry:'2027-04-19', location:'气瓶间 2 号位', amount:100, note:'' },
+];
+
+/* ================= 状态 ================= */
+const state = {
+  items: [], loans: [],
+  cfg: { url:'', key:'' },
+  me: null, sb: null, channel: null,
+  mode: 'local', conn: 'idle', errMsg: '',
+};
+
+const $ = s => document.querySelector(s);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/-/g,'').slice(0,16);
+
+/* ================= 工具 ================= */
+let toastTimer;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function askPwd(){ return prompt('🔐 此操作需要密码验证', '') === PWD; }
+function fmt(dt){
+  if(!dt) return '';
+  const d = new Date(dt);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function daysTo(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+function expiryState(item){
+  const n = daysTo(item.expiry);
+  if (n === null) return { level:'none', text:'' };
+  if (n < 0) return { level:'expired', text:`已过期 ${-n} 天` };
+  if (n <= SOON_DAYS) return { level:'soon', text:`剩 ${n} 天` };
+  return { level:'ok', text:`剩 ${n} 天` };
+}
+function isBorrowed(itemId){ return state.loans.some(l => l.item_id === itemId && !l.return_at); }
+function itemStatus(item){
+  const es = expiryState(item);
+  if (es.level === 'expired') return { cls:'b-expired', txt:'已过期' };
+  if (isBorrowed(item.id)) return { cls:'b-borrowed', txt:'已借出' };
+  return { cls:'b-available', txt:'在库' };
+}
+function findItem(id){ return state.items.find(i => i.id === id); }
+
+/* ================= 存储 ================= */
+function localSave(){
+  try{
+    localStorage.setItem(LS_ITEMS, JSON.stringify(state.items));
+    localStorage.setItem(LS_LOANS, JSON.stringify(state.loans));
+  }catch(e){ toast('本机存储失败：' + e.message); }
+}
+function localLoad(){
+  try{
+    const a = localStorage.getItem(LS_ITEMS);
+    const b = localStorage.getItem(LS_LOANS);
+    state.items = a ? JSON.parse(a) : DEMO_ITEMS.map(o => Object.assign({ id: uid(), sort: 0 }, o));
+    state.loans = b ? JSON.parse(b) : [];
+  }catch(e){ state.items = []; state.loans = []; }
+}
+function loadCfg(){
+  try{
+    const raw = localStorage.getItem(LS_CFG);
+    if (raw) state.cfg = Object.assign({ url:'', key:'' }, JSON.parse(raw));
+  }catch(e){}
+  const h = location.hash.replace(/^#/, '');
+  if (h){
+    try{
+      const q = new URLSearchParams(h);
+      if (q.get('u')) state.cfg.url = q.get('u');
+      if (q.get('k')) state.cfg.key = q.get('k');
+      saveCfg();
+    }catch(e){}
+  }
+}
+function saveCfg(){ try{ localStorage.setItem(LS_CFG, JSON.stringify(state.cfg)); }catch(e){} }
+function loadMe(){
+  try{
+    const raw = localStorage.getItem(LS_ME);
+    if (raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+function ensureName(){
+  state.me = loadMe();
+  if (!state.me){
+    state.me = { id: uid().slice(0,8), name: '' };
+  }
+  if (!state.me.name){
+    const v = (prompt('怎么称呼你？（会记在领用人里）', '') || '').trim();
+    state.me.name = v || '用户' + state.me.id.slice(0,3);
+    try{ localStorage.setItem(LS_ME, JSON.stringify(state.me)); }catch(e){}
+  }
+  $('#borrowerInput').value = state.me.name;
+}
+
+/* ================= 云端 ================= */
+async function connectCloud(){
+  if (state.channel){ try{ state.channel.unsubscribe(); }catch(e){} state.channel = null; }
+  state.sb = null;
+  if (!state.cfg.url || !state.cfg.key){
+    state.mode = 'local'; state.conn = 'idle';
+    localLoad(); renderAll(); return;
+  }
+  state.mode = 'cloud'; state.conn = 'idle'; renderConn();
+  try{
+    state.sb = createClient(state.cfg.url.replace(/\/+$/,''), state.cfg.key, {
+      auth: { persistSession:false },
+      realtime: { params: { eventsPerSecond: 20 } },
+    });
+    const [ri, rl] = await Promise.all([
+      state.sb.from(T_ITEM).select('*').order('sort', { ascending:true }),
+      state.sb.from(T_LOAN).select('*').order('borrow_at', { ascending:false }),
+    ]);
+    if (ri.error) throw ri.error;
+    if (rl.error) throw rl.error;
+    state.items = (ri.data || []).map(r => ({
+      id:r.id, code:r.code, name:r.name, gbwno:r.gbwno, batch:r.batch, spec:r.spec,
+      value:r.value, uncert:r.uncert, expiry:r.expiry || '', location:r.location,
+      amount: r.amount === null || r.amount === undefined ? 100 : Number(r.amount),
+      note:r.note, sort:Number(r.sort) || 0,
+    }));
+    state.loans = (rl.data || []).map(r => ({
+      id:r.id, item_id:r.item_id, code:r.code, name:r.name, batch:r.batch,
+      borrower:r.borrower, borrow_at:r.borrow_at, remark:r.remark,
+      return_at:r.return_at, remain: r.remain === null || r.remain === undefined ? null : Number(r.remain),
+      return_note:r.return_note,
+    }));
+    if (!state.items.length){
+      const seed = DEMO_ITEMS.map((o,i) => Object.assign({ id: uid(), sort:i }, o));
+      await state.sb.from(T_ITEM).upsert(seed.map(rowOf));
+      state.items = seed;
+    }
+    renderAll();
+    subscribe();
+    state.conn = 'live';
+  }catch(err){
+    state.conn = 'error';
+    state.errMsg = (err && err.message) || String(err);
+    localLoad(); renderAll();
+  }
+  renderConn();
+}
+function rowOf(it){
+  return {
+    id:it.id, code:it.code || '', name:it.name || '', gbwno:it.gbwno || '', batch:it.batch || '',
+    spec:it.spec || '', value:it.value || '', uncert:it.uncert || '',
+    expiry: it.expiry || null, location:it.location || '',
+    amount: Number(it.amount) || 0, note:it.note || '', sort: Number(it.sort) || 0,
+  };
+}
+function loanRowOf(l){
+  return {
+    id:l.id, item_id:l.item_id || null, code:l.code || '', name:l.name || '', batch:l.batch || '',
+    borrower:l.borrower || '', borrow_at:l.borrow_at, remark:l.remark || '',
+    return_at:l.return_at || null, remain: l.remain === null || l.remain === undefined ? null : Number(l.remain),
+    return_note:l.return_note || '',
+  };
+}
+function subscribe(){
+  const ch = state.sb.channel('crm-sync', { config:{ presence:{ key: state.me.id } } });
+
+  ch.on('postgres_changes', { event:'*', schema:'public', table:T_ITEM }, p => {
+    if (p.eventType === 'DELETE'){
+      const id = p.old && p.old.id;
+      state.items = state.items.filter(i => i.id !== id);
+    } else {
+      const r = p.new;
+      const it = {
+        id:r.id, code:r.code, name:r.name, gbwno:r.gbwno, batch:r.batch, spec:r.spec,
+        value:r.value, uncert:r.uncert, expiry:r.expiry || '', location:r.location,
+        amount: r.amount === null || r.amount === undefined ? 100 : Number(r.amount),
+        note:r.note, sort: Number(r.sort) || 0,
+      };
+      const i = state.items.findIndex(x => x.id === it.id);
+      if (i >= 0) state.items[i] = it; else state.items.push(it);
+    }
+    renderAll();
+  });
+
+  ch.on('postgres_changes', { event:'*', schema:'public', table:T_LOAN }, p => {
+    if (p.eventType === 'DELETE'){
+      const id = p.old && p.old.id;
+      state.loans = state.loans.filter(l => l.id !== id);
+    } else {
+      const r = p.new;
+      const l = {
+        id:r.id, item_id:r.item_id, code:r.code, name:r.name, batch:r.batch,
+        borrower:r.borrower, borrow_at:r.borrow_at, remark:r.remark,
+        return_at:r.return_at, remain: r.remain === null || r.remain === undefined ? null : Number(r.remain),
+        return_note:r.return_note,
+      };
+      const i = state.loans.findIndex(x => x.id === l.id);
+      if (i >= 0) state.loans[i] = l; else state.loans.unshift(l);
+    }
+    renderAll();
+  });
+
+  ch.subscribe(async status => {
+    if (status === 'SUBSCRIBED'){
+      state.conn = 'live';
+      await ch.track({ id: state.me.id, name: state.me.name, at: Date.now() });
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+      state.conn = 'error';
+      state.errMsg = '实时频道异常（刷新页面可重连）';
+    }
+    renderConn();
+  });
+  state.channel = ch;
+}
+async function pushItem(it){
+  if (state.mode === 'local'){ localSave(); return; }
+  if (!state.sb) return;
+  const { error } = await state.sb.from(T_ITEM).upsert(rowOf(it));
+  if (error) toast('同步失败：' + error.message);
+}
+async function pushLoan(l){
+  if (state.mode === 'local'){ localSave(); return; }
+  if (!state.sb) return;
+  const { error } = await state.sb.from(T_LOAN).upsert(loanRowOf(l));
+  if (error) toast('同步失败：' + error.message);
+}
+async function dropRow(table, id){
+  if (state.mode === 'local'){ localSave(); return; }
+  if (!state.sb) return;
+  const { error } = await state.sb.from(table).delete().eq('id', id);
+  if (error) toast('删除同步失败：' + error.message);
+}
+
+/* ================= 渲染 ================= */
+function renderConn(){
+  const dot = $('#connDot'), txt = $('#connTxt');
+  dot.className = 'conn-dot' + (state.conn === 'live' ? ' live' : state.conn === 'error' ? ' err' : '');
+  txt.textContent = state.mode === 'local' ? '单机模式（仅本机）'
+    : state.conn === 'live' ? '云端已连接 · 实时同步'
+    : state.conn === 'error' ? ('连接失败：' + state.errMsg) : '连接中…';
+  txt.title = state.errMsg || '';
+}
+function renderAll(){
+  renderPanel(); renderSelect(); renderUnreturn(); renderExpiry(); renderHistory(); renderAlert(); renderConn();
+}
+function sortedItems(){
+  return [...state.items].sort((a,b) => (a.sort||0) - (b.sort||0) || String(a.code).localeCompare(String(b.code)));
+}
+function renderAlert(){
+  const un = state.loans.filter(l => !l.return_at).length;
+  $('#unreturnNum').textContent = un;
+  $('#unreturnBadge').textContent = un;
+  $('#blinkWrap').innerHTML = un > 0 ? '<span class="blink">项尚未归还</span>' : '<span>全部已归还</span>';
+  const expired = state.items.filter(i => expiryState(i).level === 'expired').length;
+  const soon = state.items.filter(i => expiryState(i).level === 'soon').length;
+  $('#expiryTxt').innerHTML = `已过期 <b style="color:#b91c1c">${expired}</b> 项　·　60 天内到期 <b style="color:#b45309">${soon}</b> 项`;
+}
+function renderPanel(){
+  const q = ($('#panelSearch').value || '').trim().toLowerCase();
+  const tb = $('#panelTbody');
+  tb.innerHTML = '';
+  const list = sortedItems().filter(i => !q || [i.code,i.name,i.gbwno,i.batch].join(' ').toLowerCase().includes(q));
+  if (!list.length){
+    tb.innerHTML = '<tr><td colspan="6" class="empty-tip">暂无标准物质，点「新建」或「导入」</td></tr>';
+    return;
+  }
+  list.forEach(it => {
+    const st = itemStatus(it);
+    const es = expiryState(it);
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td></td>';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'sel-item'; cb.value = it.id;
+    tr.children[0].appendChild(cb);
+    const add = (txt, cls) => {
+      const td = document.createElement('td');
+      td.textContent = txt || '—';
+      if (cls) td.className = cls;
+      if (cls === 'es') td.style.color = es.level === 'expired' ? '#b91c1c' : es.level === 'soon' ? '#b45309' : '';
+      tr.appendChild(td);
+      return td;
+    };
+    add(it.code);
+    add(it.name);
+    add(it.expiry || '—', 'es');
+    const tdSt = document.createElement('td');
+    const b = document.createElement('span');
+    b.className = 'badge ' + st.cls; b.textContent = st.txt;
+    tdSt.appendChild(b); tr.appendChild(tdSt);
+    const tdOp = document.createElement('td');
+    const e = document.createElement('button');
+    e.className = 'btn-icon'; e.textContent = '✏️'; e.title = '编辑';
+    e.onclick = () => openItemDlg(it);
+    tdOp.appendChild(e); tr.appendChild(tdOp);
+    tb.appendChild(tr);
+  });
+}
+function renderSelect(){
+  const sel = $('#itemSelect');
+  const keep = sel.value;
+  sel.innerHTML = '';
+  const avail = sortedItems().filter(i => !isBorrowed(i.id) && expiryState(i).level !== 'expired');
+  if (!avail.length){
+    const o = document.createElement('option');
+    o.textContent = '（无可用：全部借出或已过期）';
+    o.value = '';
+    sel.appendChild(o);
+    return;
+  }
+  avail.forEach(i => {
+    const o = document.createElement('option');
+    o.value = i.id;
+    o.textContent = `${i.code} · ${i.name}${i.value ? ' · ' + i.value : ''}${i.batch ? ' · 批' + i.batch : ''}`;
+    sel.appendChild(o);
+  });
+  if (keep && avail.some(i => i.id === keep)) sel.value = keep;
+}
+function renderUnreturn(){
+  const tb = $('#unreturnTbody');
+  tb.innerHTML = '';
+  const list = state.loans.filter(l => !l.return_at)
+    .sort((a,b) => new Date(a.borrow_at) - new Date(b.borrow_at));
+  if (!list.length){
+    tb.innerHTML = '<tr><td colspan="8" class="empty-tip">当前没有未归还的标准物质 🎉</td></tr>';
+    return;
+  }
+  list.forEach(l => {
+    const tr = document.createElement('tr');
+    tr.className = 'row-unreturn';
+    const tdS = document.createElement('td');
+    const b = document.createElement('span');
+    b.className = 'badge b-borrowed'; b.textContent = '⚠️ 未归还';
+    tdS.appendChild(b); tr.appendChild(tdS);
+    [l.code, l.name, l.batch, l.borrower, l.remark].forEach(v => {
+      const td = document.createElement('td'); td.textContent = v || '—'; tr.appendChild(td);
+    });
+    const tdT = document.createElement('td');
+    tdT.className = 'mono'; tdT.textContent = fmt(l.borrow_at); tr.appendChild(tdT);
+    const tdOp = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'btn-sm btn-green'; btn.textContent = '📥 归还';
+    btn.onclick = () => openReturnDlg(l);
+    tdOp.appendChild(btn); tr.appendChild(tdOp);
+    tb.appendChild(tr);
+  });
+}
+function renderExpiry(){
+  const tb = $('#expiryTbody');
+  tb.innerHTML = '';
+  const list = sortedItems()
+    .map(i => ({ i, es: expiryState(i) }))
+    .filter(x => x.es.level === 'expired' || x.es.level === 'soon')
+    .sort((a,b) => (daysTo(a.i.expiry) ?? 9999) - (daysTo(b.i.expiry) ?? 9999));
+  if (!list.length){
+    tb.innerHTML = '<tr><td colspan="8" class="empty-tip">没有过期或临期标准物质 ✅</td></tr>';
+    return;
+  }
+  list.forEach(({ i, es }) => {
+    const tr = document.createElement('tr');
+    if (es.level === 'expired') tr.className = 'row-expired'; else tr.className = 'row-soon';
+    const tdS = document.createElement('td');
+    const b = document.createElement('span');
+    b.className = 'badge ' + (es.level === 'expired' ? 'b-expired' : 'b-soon');
+    b.textContent = es.level === 'expired' ? '已过期' : '临期';
+    tdS.appendChild(b); tr.appendChild(tdS);
+    [i.code, i.name, i.batch, i.expiry].forEach((v, k) => {
+      const td = document.createElement('td');
+      td.textContent = v || '—';
+      if (k === 3) td.className = 'mono';
+      tr.appendChild(td);
+    });
+    const tdD = document.createElement('td');
+    tdD.textContent = es.text; tr.appendChild(tdD);
+    const tdL = document.createElement('td'); tdL.textContent = i.location || '—'; tr.appendChild(tdL);
+    const tdN = document.createElement('td');
+    tdN.textContent = isBorrowed(i.id) ? '已借出' : '在库'; tr.appendChild(tdN);
+    tb.appendChild(tr);
+  });
+}
+function renderHistory(){
+  const tb = $('#historyTbody');
+  tb.innerHTML = '';
+  const q = ($('#histSearch').value || '').trim().toLowerCase();
+  const list = [...state.loans]
+    .filter(l => !q || [l.code,l.name,l.borrower,l.batch].join(' ').toLowerCase().includes(q))
+    .sort((a,b) => new Date(b.borrow_at) - new Date(a.borrow_at));
+  if (!list.length){
+    tb.innerHTML = '<tr><td colspan="8" class="empty-tip">暂无领用记录</td></tr>';
+    return;
+  }
+  list.forEach(l => {
+    const tr = document.createElement('tr');
+    [l.code, l.name, l.batch, l.borrower].forEach(v => {
+      const td = document.createElement('td'); td.textContent = v || '—'; tr.appendChild(td);
+    });
+    const tdB = document.createElement('td'); tdB.className = 'mono'; tdB.textContent = fmt(l.borrow_at); tr.appendChild(tdB);
+    const tdR = document.createElement('td'); tdR.className = 'mono';
+    if (l.return_at) tdR.textContent = fmt(l.return_at);
+    else { const s = document.createElement('span'); s.className = 'badge b-borrowed'; s.textContent = '未归还'; tdR.appendChild(s); }
+    tr.appendChild(tdR);
+    const tdM = document.createElement('td');
+    tdM.textContent = l.remain === null || l.remain === undefined ? '—' : l.remain + '%';
+    tr.appendChild(tdM);
+    const tdN = document.createElement('td');
+    tdN.textContent = (l.remark || '—') + (l.return_note ? '；归还：' + l.return_note : '');
+    tr.appendChild(tdN);
+    tb.appendChild(tr);
+  });
+}
+
+/* ================= 业务动作 ================= */
+function doBorrow(){
+  const id = $('#itemSelect').value;
+  if (!id){ toast('请先选择标准物质'); return; }
+  const it = findItem(id);
+  if (!it){ toast('未找到该标准物质'); return; }
+  const who = ($('#borrowerInput').value || '').trim();
+  if (!who){ toast('请填写领用人'); $('#borrowerInput').focus(); return; }
+  if (isBorrowed(id)){ toast('该标准物质已被借出'); return; }
+  const es = expiryState(it);
+  if (es.level === 'expired' && !confirm(`⚠️ ${it.code} ${it.name} 已过期（${it.expiry}），确认仍要领用？`)) return;
+  const loan = {
+    id: uid(), item_id: it.id, code: it.code, name: it.name, batch: it.batch || '',
+    borrower: who, borrow_at: new Date().toISOString(),
+    remark: ($('#remarkInput').value || '').trim(),
+    return_at: null, remain: null, return_note: '',
+  };
+  state.loans.unshift(loan);
+  pushLoan(loan);
+  $('#remarkInput').value = '';
+  try{ localStorage.setItem(LS_ME, JSON.stringify(state.me)); }catch(e){}
+  renderAll();
+  toast(`已登记：${it.code} → ${who}`);
+}
+function openReturnDlg(l){
+  $('#r_id').value = l.id;
+  $('#r_remain').value = 100;
+  $('#r_note').value = '';
+  $('#returnInfo').textContent = `${l.code} · ${l.name}（${l.batch || '无批号'}）　领用人：${l.borrower || '—'}　领用时间：${fmt(l.borrow_at)}`;
+  $('#returnDlg').showModal();
+}
+function confirmReturn(){
+  const id = $('#r_id').value;
+  const l = state.loans.find(x => x.id === id);
+  if (!l) return;
+  const remainRaw = $('#r_remain').value;
+  let remain = remainRaw === '' ? null : Math.max(0, Math.min(100, Number(remainRaw)));
+  if (remain !== null && isNaN(remain)) remain = null;
+  l.return_at = new Date().toISOString();
+  l.remain = remain;
+  l.return_note = ($('#r_note').value || '').trim();
+  pushLoan(l);
+  const it = findItem(l.item_id);
+  if (it && remain !== null){
+    it.amount = remain;
+    pushItem(it);
+  }
+  $('#returnDlg').close();
+  renderAll();
+  toast(`已归还：${l.code}${remain !== null ? '，余量 ' + remain + '%' : ''}`);
+}
+
+/* ================= 增删改 ================= */
+function openItemDlg(item){
+  const isNew = !item;
+  $('#itemDlgTitle').textContent = isNew ? '➕ 新建标准物质' : '✏️ 编辑标准物质';
+  $('#deleteItemBtn').style.display = isNew ? 'none' : 'inline-block';
+  const f = { id:'', code:'', name:'', gbwno:'', batch:'', spec:'', value:'', uncert:'', expiry:'', location:'', amount:100, note:'' };
+  Object.assign(f, item || {});
+  $('#f_id').value = f.id;
+  ['code','name','gbwno','batch','spec','value','uncert','expiry','location','amount','note'].forEach(k => {
+    $('#f_' + k).value = f[k] === undefined || f[k] === null ? (k === 'amount' ? 100 : '') : f[k];
+  });
+  $('#itemDlg').showModal();
+}
+function saveItem(){
+  const code = $('#f_code').value.trim();
+  const name = $('#f_name').value.trim();
+  if (!code || !name){ toast('编号和名称必填'); return; }
+  const data = {
+    code, name,
+    gbwno: $('#f_gbwno').value.trim(),
+    batch: $('#f_batch').value.trim(),
+    spec: $('#f_spec').value.trim(),
+    value: $('#f_value').value.trim(),
+    uncert: $('#f_uncert').value.trim(),
+    expiry: $('#f_expiry').value,
+    location: $('#f_location').value.trim(),
+    amount: Number($('#f_amount').value) || 100,
+    note: $('#f_note').value.trim(),
+  };
+  const id = $('#f_id').value;
+  if (id){
+    const it = findItem(id);
+    if (it){ Object.assign(it, data); pushItem(it); }
+  } else {
+    const it = Object.assign({ id: uid(), sort: Date.now() }, data);
+    state.items.push(it);
+    pushItem(it);
+  }
+  $('#itemDlg').close();
+  renderAll();
+  toast('已保存');
+}
+function deleteItem(){
+  const id = $('#f_id').value;
+  const it = findItem(id);
+  if (!it) return;
+  if (isBorrowed(id)){ toast('该物质处于借出状态，请先归还再删除'); return; }
+  if (!askPwd()) { toast('密码错误'); return; }
+  if (!confirm(`确认删除 ${it.code} ${it.name}？`)) return;
+  state.items = state.items.filter(x => x.id !== id);
+  dropRow(T_ITEM, id);
+  $('#itemDlg').close();
+  renderAll();
+  toast('已删除');
+}
+function batchDelete(){
+  const boxes = [...document.querySelectorAll('.sel-item:checked')];
+  if (!boxes.length){ toast('请先勾选要删除的项'); return; }
+  const ids = boxes.map(b => b.value);
+  const busy = ids.filter(isBorrowed);
+  if (busy.length){ toast('有 ' + busy.length + ' 项处于借出状态，请先归还'); return; }
+  if (!askPwd()){ toast('密码错误'); return; }
+  if (!confirm(`确认删除选中的 ${ids.length} 项标准物质？`)) return;
+  state.items = state.items.filter(x => !ids.includes(x.id));
+  ids.forEach(id => dropRow(T_ITEM, id));
+  renderAll();
+  toast(`已删除 ${ids.length} 项`);
+}
+
+/* ================= Excel ================= */
+const COLMAP = {
+  code:['编号','物质编号','标准物质编号','编号/代码','编码','序号','NO','no'],
+  name:['名称','标准物质名称','物质名称','品名','标准物质','名称及编号'],
+  gbwno:['gbw','gbw号','gbw(e)','标准号','国标号','标准物质号','证书号'],
+  batch:['批号','批次','批号/批次','lot','batch'],
+  spec:['规格','包装','规格/包装','包装规格'],
+  value:['标准值','浓度','标准值/浓度','量值','特性量值','标准浓度'],
+  uncert:['不确定度','扩展不确定度','u','不确定度(k=2)','相对扩展不确定度'],
+  expiry:['有效期','有效期限','有效期至','失效日期','有效期到'],
+  location:['位置','存放位置','存放地点','存储位置','柜位'],
+  amount:['余量','剩余量','当前余量','余量%','剩余'],
+  note:['备注','说明','注释'],
+};
+function pickCol(headers, keys){
+  const norm = h => String(h || '').trim().toLowerCase().replace(/\s/g,'');
+  for (const k of keys){
+    const hit = headers.find(h => norm(h) === norm(k));
+    if (hit) return hit;
+  }
+  for (const k of keys){
+    const hit = headers.find(h => norm(h).includes(norm(k)));
+    if (hit) return hit;
+  }
+  return null;
+}
+function normDate(v){
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  if (typeof v === 'number'){ // Excel 序列号
+    const d = new Date(Math.round((v - 25569) * 86400000));
+    return isNaN(d) ? '' : d.toISOString().slice(0,10);
+  }
+  const s = String(v).trim().replace(/[年月]/g,'-').replace(/日/g,'').replace(/\//g,'-');
+  const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  return '';
+}
+function doImport(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+      if (!rows.length){ toast('表格里没有数据'); return; }
+      const headers = Object.keys(rows[0]);
+      const map = {};
+      Object.entries(COLMAP).forEach(([k, keys]) => { map[k] = pickCol(headers, keys); });
+      if (!map.code || !map.name){ toast('未能识别「编号」「名称」列，请检查表头'); return; }
+      const items = rows.map(r => ({
+        id: uid(), sort: 0,
+        code: String(r[map.code] ?? '').trim(),
+        name: String(r[map.name] ?? '').trim(),
+        gbwno: map.gbwno ? String(r[map.gbwno] ?? '').trim() : '',
+        batch: map.batch ? String(r[map.batch] ?? '').trim() : '',
+        spec: map.spec ? String(r[map.spec] ?? '').trim() : '',
+        value: map.value ? String(r[map.value] ?? '').trim() : '',
+        uncert: map.uncert ? String(r[map.uncert] ?? '').trim() : '',
+        expiry: map.expiry ? normDate(r[map.expiry]) : '',
+        location: map.location ? String(r[map.location] ?? '').trim() : '',
+        amount: map.amount ? (Number(String(r[map.amount]).replace('%','')) || 100) : 100,
+        note: map.note ? String(r[map.note] ?? '').trim() : '',
+      })).filter(x => x.code && x.name);
+      if (!items.length){ toast('没有有效行（编号或名称为空）'); return; }
+      if (!askPwd()){ toast('密码错误'); return; }
+      if (!confirm(`识别到 ${items.length} 项，导入将【覆盖】现有台账，继续？`)) return;
+      const oldIds = state.items.map(i => i.id);
+      state.items = items;
+      if (state.mode === 'local') localSave();
+      else {
+        oldIds.forEach(id => state.sb.from(T_ITEM).delete().eq('id', id));
+        state.sb.from(T_ITEM).upsert(items.map(rowOf)).then(r => {
+          if (r.error) toast('导入同步失败：' + r.error.message); else toast(`导入成功 ${items.length} 项`);
+        });
+      }
+      renderAll();
+      toast(`导入成功 ${items.length} 项`);
+    }catch(err){ toast('导入失败：' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function exportItems(){
+  const data = sortedItems().map(i => ({
+    '编号':i.code, '名称':i.name, 'GBW号':i.gbwno || '', '批号':i.batch || '',
+    '规格':i.spec || '', '标准值/浓度':i.value || '', '不确定度':i.uncert || '',
+    '有效期':i.expiry || '', '存放位置':i.location || '', '当前余量%':i.amount,
+    '状态':itemStatus(i).txt, '备注':i.note || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:28},{wch:16},{wch:12},{wch:14},{wch:14},{wch:12},{wch:12},{wch:14},{wch:10},{wch:10},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '标准物质台账');
+  XLSX.writeFile(wb, `标准物质台账_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('台账已导出');
+}
+function exportRecords(){
+  const data = [...state.loans].sort((a,b) => new Date(b.borrow_at) - new Date(a.borrow_at)).map(l => ({
+    '编号':l.code, '名称':l.name, '批号':l.batch || '', '领用人':l.borrower,
+    '领用时间':fmt(l.borrow_at), '归还时间':l.return_at ? fmt(l.return_at) : '未归还',
+    '归还余量%': l.remain === null || l.remain === undefined ? '' : l.remain,
+    '用途/备注':l.remark || '', '归还备注':l.return_note || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:12},{wch:28},{wch:12},{wch:10},{wch:18},{wch:18},{wch:11},{wch:28},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '领用归还记录');
+  XLSX.writeFile(wb, `标准物质领用记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('记录已导出');
+}
+
+/* ================= 绑定 ================= */
+function bind(){
+  $('#collapseToggle').onclick = () => {
+    const p = $('#sidePanel');
+    const collapsed = p.classList.contains('collapsed');
+    p.classList.toggle('collapsed', !collapsed);
+    p.classList.toggle('expanded', collapsed);
+    $('#panelContent').style.display = collapsed ? 'block' : 'none';
+  };
+  $('#newItemBtn').onclick = () => openItemDlg(null);
+  $('#saveItemBtn').onclick = saveItem;
+  $('#cancelItemBtn').onclick = () => $('#itemDlg').close();
+  $('#deleteItemBtn').onclick = deleteItem;
+  $('#batchDelBtn').onclick = batchDelete;
+  $('#selAll').onchange = e => document.querySelectorAll('.sel-item').forEach(b => b.checked = e.target.checked);
+  $('#panelSearch').oninput = renderPanel;
+  $('#importItemBtn').onclick = () => $('#importFile').click();
+  $('#importFile').onchange = e => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ''; };
+  $('#exportItemBtn').onclick = exportItems;
+  $('#exportRecBtn').onclick = exportRecords;
+
+  $('#borrowBtn').onclick = doBorrow;
+  $('#searchInput').oninput = e => {
+    const q = e.target.value.trim().toLowerCase();
+    const hit = sortedItems().find(i => [i.code,i.name,i.gbwno,i.batch].join(' ').toLowerCase().includes(q));
+    if (hit && !isBorrowed(hit.id) && expiryState(hit).level !== 'expired') $('#itemSelect').value = hit.id;
+  };
+  $('#histSearch').oninput = renderHistory;
+
+  $('#confirmReturnBtn').onclick = confirmReturn;
+  $('#cancelReturnBtn').onclick = () => $('#returnDlg').close();
+
+  $('#toggleExpiryBtn').onclick = e => {
+    const box = $('#expiryBox');
+    const open = box.style.display !== 'none';
+    box.style.display = open ? 'none' : 'block';
+    e.target.textContent = open ? '▶' : '▼';
+  };
+  $('#toggleHistoryBtn').onclick = e => {
+    const box = $('#historyBox');
+    const open = box.style.display !== 'none';
+    box.style.display = open ? 'none' : 'block';
+    e.target.textContent = open ? '▶' : '▼';
+  };
+
+  $('#nameBtn').onclick = () => {
+    const v = (prompt('你的名字（用于默认领用人）', state.me.name || '') || '').trim();
+    if (v){ state.me.name = v.slice(0,12); try{ localStorage.setItem(LS_ME, JSON.stringify(state.me)); }catch(e){} $('#borrowerInput').value = v; }
+  };
+  $('#shareBtn').onclick = async () => {
+    if (!state.cfg.url || !state.cfg.key){
+      toast('请先配置云同步，再生成分享链接');
+      $('#cfgUrl').value = state.cfg.url || '';
+      $('#cfgKey').value = state.cfg.key || '';
+      $('#syncDlg').showModal();
+      return;
+    }
+    const url = new URL(location.href);
+    url.hash = new URLSearchParams({ u: state.cfg.url, k: state.cfg.key }).toString();
+    const link = url.toString();
+    try{
+      await navigator.clipboard.writeText(link);
+      toast('分享链接已复制 · 同事打开即自动连上同一份台账');
+    }catch(e){ prompt('复制这个链接发给同事：', link); }
+  };
+  $('#syncBtn').onclick = () => {
+    $('#cfgUrl').value = state.cfg.url || '';
+    $('#cfgKey').value = state.cfg.key || '';
+    $('#syncDlg').showModal();
+  };
+  $('#saveCfgBtn').onclick = () => {
+    state.cfg = { url: $('#cfgUrl').value.trim().replace(/\/+$/,''), key: $('#cfgKey').value.trim() };
+    saveCfg();
+    $('#syncDlg').close();
+    connectCloud();
+  };
+  $('#clearCfgBtn').onclick = () => {
+    state.cfg = { url:'', key:'' }; saveCfg();
+    $('#cfgUrl').value = ''; $('#cfgKey').value = '';
+    $('#syncDlg').close(); connectCloud();
+  };
+  $('#testCfgBtn').onclick = async () => {
+    const u = $('#cfgUrl').value.trim().replace(/\/+$/,'');
+    const k = $('#cfgKey').value.trim();
+    if (!u || !k){ toast('两项都要填'); return; }
+    toast('测试中…');
+    try{
+      const c = createClient(u, k, { auth:{ persistSession:false } });
+      const r = await c.from(T_ITEM).select('id').limit(1);
+      toast(r.error ? ('失败：' + r.error.message) : '连接正常，可以保存了');
+    }catch(err){ toast('失败：' + ((err && err.message) || err)); }
+  };
+  $('#copySqlBtn').onclick = async () => {
+    try{ await navigator.clipboard.writeText(SQL); toast('SQL 已复制'); }
+    catch(e){ toast('复制失败，请手动选中'); }
+  };
+  $('#sqlBox').textContent = SQL;
+
+  window.addEventListener('online', () => { if (state.mode === 'cloud') connectCloud(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){ /* dialog 默认处理 */ }
+  });
+}
+
+/* ================= 启动 ================= */
+function boot(){
+  loadCfg();
+  ensureName();
+  bind();
+  state.mode = (state.cfg.url && state.cfg.key) ? 'cloud' : 'local';
+  if (state.mode === 'local'){ localLoad(); renderAll(); }
+  connectCloud();
+  setInterval(() => { renderUnreturn(); renderAlert(); }, 10000);
+}
+boot();
+</script>
+</body>
+</html>
