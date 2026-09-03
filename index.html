@@ -101,6 +101,21 @@
     .legend { display:flex; align-items:center; gap:10px; font-size:.72rem; color:#64748b; margin-bottom:12px; flex-wrap:wrap; }
     .legend .bar { width:180px; height:12px; border-radius:20px; background:linear-gradient(90deg,hsl(0,70%,60%),hsl(60,70%,60%),hsl(120,70%,60%)); }
     .legend .sw { width:14px; height:14px; border-radius:4px; display:inline-block; vertical-align:-3px; margin-right:4px; border:1px solid #cbd5e1; }
+    .stat-line { font-size:.78rem; color:#475569; background:#f8fafc; border-radius:14px; padding:8px 14px; margin-bottom:12px; }
+    .filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+    .filter-bar input[type=search] { flex:1; min-width:230px; width:auto; padding:8px 12px; font-size:.8rem; }
+    .mini { width:auto; padding:7px 10px; font-size:.75rem; border-radius:12px; border:1px solid #cbd5e1; background:#fff; }
+    .chip { padding:5px 13px; border-radius:20px; border:1px solid #e2e8f0; background:#fff; font-size:.75rem; cursor:pointer; color:#475569; font-family:inherit; font-weight:500; }
+    .chip:hover { background:#f1f5f9; transform:none; }
+    .chip.on { background:#3b82f6; border-color:#3b82f6; color:#fff; font-weight:600; }
+    .chip.on:hover { background:#2563eb; }
+    .table-scroll { max-height:58vh; overflow:auto; border:1px solid #eef2ff; border-radius:14px; }
+    .table-scroll table { font-size:.8rem; }
+    .table-scroll thead th { position:sticky; top:0; z-index:5; background:#f8fafc; box-shadow:0 1px 0 #e2e8f0; }
+    .pager { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:12px; font-size:.78rem; color:#475569; flex-wrap:wrap; }
+    .pick-info { display:none; margin:2px 0 14px; padding:9px 14px; border-radius:14px; background:#eff6ff; color:#1e40af; font-size:.8rem; font-weight:500; line-height:1.6; }
+    .pick-info.warn { background:#fef2f2; color:#b91c1c; }
+    .pick-info.soon { background:#fffbeb; color:#92400e; }
 
     dialog { border:none; border-radius:28px; padding:0; box-shadow:0 20px 45px -10px rgba(0,0,0,.25); max-width:580px; width:calc(100% - 32px); color:#0f172a; }
     dialog::backdrop { background:rgba(15,23,42,.45); backdrop-filter:blur(2px); }
@@ -117,7 +132,56 @@
     .toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%,20px); z-index:1000; background:#111827; color:#fff; padding:10px 18px; border-radius:40px; font-size:.85rem; opacity:0; transition:.22s; pointer-events:none; }
     .toast.show { opacity:1; transform:translate(-50%,0); }
     .footer-note { margin-top:20px; text-align:center; font-size:.7rem; color:#6c757d; border-top:1px solid #e2e8f0; padding-top:16px; line-height:1.8; }
-    @media(max-width:900px){ .app-container{flex-direction:column} .side-panel.expanded{width:100%} }
+
+    /* ===== 平板 / 手机 适配 ===== */
+    @media(max-width:900px){
+      .app-container{ flex-direction:column; gap:12px; }
+      .side-panel.expanded{ width:100%; }
+      .side-panel.collapsed{ width:100%; min-width:0; }
+      .collapse-handle{ writing-mode:horizontal-tb; width:100%; padding:11px; letter-spacing:2px; border-right:none; border-bottom:1px solid #e2e8f0; }
+      .panel-content{ max-height:none; }
+      .main-content{ overflow-x:hidden; }
+    }
+    @media(max-width:680px){
+      body{ padding:10px; font-size:14px; }
+      .app-container{ gap:10px; }
+      .main-content{ border-radius:18px; padding:14px 14px 20px; box-shadow:none; border:1px solid #eef2f7; }
+      .alert-bar{ border-radius:14px; padding:10px 14px; gap:8px; flex-direction:column; align-items:stretch; }
+      .alert-bar .grp{ font-size:.76rem; }
+      .alert-bar .grp[style*="margin-left:auto"]{ margin-left:0 !important; flex-wrap:wrap; justify-content:flex-start; }
+      .alert-bar button{ font-size:.76rem; padding:9px 12px; }
+      .tabs{ overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; padding-bottom:2px; }
+      .tabs::-webkit-scrollbar{ height:0; }
+      .tab{ white-space:nowrap; padding:9px 15px; font-size:.82rem; flex:0 0 auto; }
+      .tab .cnt{ font-size:.66rem; }
+      .card{ border-radius:18px; padding:14px; margin-bottom:16px; }
+      .card-title{ font-size:1.02rem; gap:8px; margin-bottom:12px; }
+      .title-actions{ gap:6px; }
+      .title-actions .btn-sm{ font-size:.7rem; padding:7px 10px; }
+      .form-row{ flex-direction:column; gap:10px; align-items:stretch; }
+      .form-group{ min-width:100% !important; flex:none !important; }
+      input,select,textarea{ font-size:16px; padding:11px 12px; }   /* 16px 防止 iOS 聚焦缩放 */
+      .filter-bar{ flex-wrap:wrap; gap:8px; }
+      .filter-bar input[type=search]{ flex:1 1 100%; min-width:0; width:100%; font-size:16px; }
+      .chip{ white-space:nowrap; min-height:34px; display:inline-flex; align-items:center; }
+      .mini{ font-size:.8rem; min-height:36px; }
+      .stat-line{ font-size:.74rem; line-height:1.7; padding:8px 12px; }
+      table{ font-size:.76rem; }
+      th,td{ padding:8px 6px; }
+      .table-scroll{ max-height:62vh; font-size:.76rem; }
+      button{ min-height:38px; font-size:.85rem; }
+      .btn-sm{ min-height:32px; }
+      .btn-icon{ font-size:1.05rem; padding:6px 10px; }
+      .pager{ gap:6px; font-size:.74rem; }
+      .pager .btn-sm{ min-height:38px; padding:8px 12px; }
+      .pager input.mini{ width:58px; }
+      dialog{ width:calc(100% - 20px); max-width:none; border-radius:22px; }
+      .dlg-h{ font-size:1rem; padding:16px 18px 0; }
+      .dlg-b{ padding:12px 18px 6px; }
+      .dlg-f{ padding:12px 18px 16px; }
+      .gas-grid-container{ -webkit-overflow-scrolling:touch; }
+      .gas-grid{ min-width:560px; }
+    }
 </style>
 </head>
 <body>
@@ -409,7 +473,7 @@ const DEMO = [
 ];
 
 /* ================= 状态 ================= */
-const state = { items:[], loans:[], tab:'material', cfg:{url:'',key:''}, me:null, sb:null, channel:null, mode:'local', conn:'idle', errMsg:'' };
+const state = { items:[], loans:[], tab:'material', ui:null, cfg:{url:'',key:''}, me:null, sb:null, channel:null, mode:'local', conn:'idle', errMsg:'' };
 const $ = s => document.querySelector(s);
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random()).replace(/-/g,'').slice(0,16);
 
@@ -571,7 +635,8 @@ function renderPanel(){
     .filter(i=>!q||[i.code,i.name,i.gbwno,i.batch].join(' ').toLowerCase().includes(q))
     .sort((a,b)=>a.type.localeCompare(b.type)||(a.sort||0)-(b.sort||0));
   if(!list.length){ tb.innerHTML='<tr><td colspan="6" class="empty-tip">暂无数据</td></tr>'; return; }
-  list.forEach(it=>{
+  const CAP=200, shown=list.slice(0,CAP);
+  shown.forEach(it=>{
     const st=itemStatus(it), es=expiryState(it), tr=document.createElement('tr');
     const td0=document.createElement('td');
     const cb=document.createElement('input'); cb.type='checkbox'; cb.className='sel-item'; cb.value=it.id; td0.appendChild(cb); tr.appendChild(td0);
@@ -585,155 +650,383 @@ function renderPanel(){
     e.className='btn-icon'; e.textContent='✏️'; e.title='编辑'; e.onclick=()=>openItemDlg(it); tdO.appendChild(e); tr.appendChild(tdO);
     tb.appendChild(tr);
   });
+  if(list.length>CAP){
+    const tr=document.createElement('tr'), td=document.createElement('td');
+    td.colSpan=6; td.className='empty-tip';
+    td.textContent='仅显示前 '+CAP+' 条（共 '+list.length+' 条），请用上方搜索或筛选缩小范围';
+    tr.appendChild(td); tb.appendChild(tr);
+  }
 }
 
 /* --- 主区：按 tab 渲染 --- */
+const UIKEY='wbCrm.ui.v2';
+function defaultUI(){ return {
+  material:  { open:false, q:'', st:'all', sk:'code', sd:1, pg:1, ps:100 },
+  gas:       { open:true,  q:'', st:'all', sk:'code', sd:1, pg:1, ps:100 },
+  equipment: { open:false, q:'', st:'all', sk:'code', sd:1, pg:1, ps:100 },
+}; }
+function loadUI(){
+  const ui=defaultUI();
+  try{
+    const raw=localStorage.getItem(UIKEY);
+    if(raw){ const sv=JSON.parse(raw);
+      Object.keys(ui).forEach(k=>{ if(sv[k]){ ui[k].open=!!sv[k].open; if(sv[k].ps) ui[k].ps=Number(sv[k].ps)||100; } });
+    }
+  }catch(e){}
+  return ui;
+}
+function saveUI(){
+  try{ const o={}; Object.entries(state.ui).forEach(([k,v])=>{ o[k]={open:v.open,ps:v.ps}; }); localStorage.setItem(UIKEY,JSON.stringify(o)); }catch(e){}
+}
+
 function renderPane(){
+  // 云端实时事件会触发重绘，需保住用户正在输入的焦点与光标位置
+  const act=document.activeElement;
+  const fid=(act&&act.id)?act.id:null;
+  const pos=(act&&act.selectionStart!=null)?act.selectionStart:null;
   const pane=$('#pane'); pane.innerHTML='';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===state.tab));
-  if(state.tab==='material') pane.appendChild(paneMaterial());
-  else if(state.tab==='gas') pane.appendChild(paneGas());
-  else pane.appendChild(paneEquipment());
+  if(state.tab==='material'){ pane.appendChild(takeCard('material')); pane.appendChild(ledgerCard('material')); }
+  else if(state.tab==='equipment'){ pane.appendChild(takeCard('equipment')); pane.appendChild(ledgerCard('equipment')); }
+  else { pane.appendChild(gasGridCard()); pane.appendChild(ledgerCard('gas')); }
+  if(fid){
+    const el=document.getElementById(fid);
+    if(el){ el.focus(); if(pos!=null && el.setSelectionRange){ try{ el.setSelectionRange(pos,pos); }catch(e){} } }
+  }
 }
 function cardEl(title, actions){
   const c=document.createElement('div'); c.className='card';
-  const h=document.createElement('div'); h.className='card-title'; h.textContent=title;
+  const h=document.createElement('div'); h.className='card-title';
+  const sp=document.createElement('span'); sp.textContent=title; h.appendChild(sp);
   if(actions){ const w=document.createElement('div'); w.className='title-actions'; actions.forEach(a=>w.appendChild(a)); h.appendChild(w); }
   c.appendChild(h); return c;
 }
 function btn(txt, cls, fn){ const b=document.createElement('button'); b.className=cls||'btn-sm btn-blue'; b.textContent=txt; b.onclick=fn; return b; }
-function fillPick(sel, si, type){
-  const go=()=>{
+
+/* ---- 统计 ---- */
+function statsOf(list){
+  const s={ total:list.length, avail:0, borrowed:0, out:0, expired:0, soon:0, low:0 };
+  list.forEach(i=>{
+    const es=expiryState(i), st=itemStatus(i);
+    if(es.level==='expired') s.expired++; else if(es.level==='soon') s.soon++;
+    if(st.txt==='在库') s.avail++;
+    else if(st.txt==='借出中') s.borrowed++;
+    else if(st.txt==='库存耗尽') s.out++;
+    if(i.type==='material' && !i.need_return && Number(i.qty||0)>0 && Number(i.qty||0)<=1) s.low++;
+  });
+  return s;
+}
+function statLine(type){
+  const s=statsOf(byType(type));
+  const p=[`共 ${s.total} 项`,`在库 ${s.avail}`,`借出 ${s.borrowed}`];
+  if(type==='material') p.push(`库存≤1 ${s.low}`,`耗尽 ${s.out}`);
+  p.push(`临期 ${s.soon}`,`已过期 ${s.expired}`);
+  return p.join('　·　');
+}
+
+/* ---- 列 / 筛选 / 排序 ---- */
+const COLS={
+  material:[{k:'code',l:'编号'},{k:'name',l:'名称'},{k:'gbwno',l:'GBW 号'},{k:'batch',l:'批号'},{k:'value',l:'标准值'},{k:'spec',l:'规格'},{k:'expiry',l:'有效期'},{k:'location',l:'位置'},{k:'qty',l:'库存'},{k:'need_return',l:'归还方式'},{k:'_st',l:'状态'},{k:'_op',l:'操作'}],
+  gas:[{k:'code',l:'编号'},{k:'name',l:'气体名称'},{k:'value',l:'浓度'},{k:'cabinet',l:'柜体'},{k:'position',l:'柜位'},{k:'amount',l:'余量'},{k:'expiry',l:'有效期'},{k:'_st',l:'状态'},{k:'_op',l:'操作'}],
+  equipment:[{k:'code',l:'编号'},{k:'name',l:'名称'},{k:'uncert',l:'型号'},{k:'batch',l:'资产号'},{k:'value',l:'参数'},{k:'expiry',l:'校准有效期'},{k:'location',l:'位置'},{k:'_st',l:'状态'},{k:'_op',l:'操作'}],
+};
+const FILTERS={
+  material:[['all','全部'],['available','在库'],['borrowed','借出中'],['needreturn','需归还'],['low','库存≤1'],['out','耗尽'],['soon','临期'],['expired','已过期']],
+  gas:[['all','全部'],['available','在库'],['borrowed','借出中'],['soon','临期'],['expired','已过期']],
+  equipment:[['all','全部'],['available','在库'],['borrowed','借出中'],['soon','临期'],['expired','已过期']],
+};
+function matchFilter(it, f){
+  const es=expiryState(it), s=itemStatus(it);
+  if(f==='available') return s.txt==='在库' && es.level!=='expired';
+  if(f==='borrowed') return s.txt==='借出中';
+  if(f==='out') return s.txt==='库存耗尽';
+  if(f==='soon') return es.level==='soon';
+  if(f==='expired') return es.level==='expired';
+  if(f==='needreturn') return !!it.need_return;
+  if(f==='low') return it.type==='material' && !it.need_return && Number(it.qty||0)>0 && Number(it.qty||0)<=1;
+  return true;
+}
+function sortVal(it,k){
+  if(k==='_st') return itemStatus(it).txt;
+  if(k==='qty'||k==='amount') return Number(it[k])||0;
+  if(k==='need_return') return it.need_return?1:0;
+  if(k==='cabinet') return it.cabinet||'';
+  if(k==='position') return String(it.position||'').replace(/(\d+)/, (m)=>String(m).padStart(4,'0'));
+  return String(it[k]||'');
+}
+function filtered(type){
+  const ui=state.ui[type], q=(ui.q||'').trim().toLowerCase();
+  let list=byType(type).filter(i=>matchFilter(i,ui.st));
+  if(q) list=list.filter(i=>[i.code,i.name,i.gbwno,i.batch,i.value,i.spec,i.location,i.uncert,i.position,i.note].join(' ').toLowerCase().includes(q));
+  const dir=ui.sd||1;
+  list.sort((a,b)=>{
+    const x=sortVal(a,ui.sk), y=sortVal(b,ui.sk);
+    const r=(typeof x==='number'&&typeof y==='number') ? x-y : String(x).localeCompare(String(y),'zh');
+    return r*dir;
+  });
+  return list;
+}
+
+/* ---- 通用台账卡（折叠 / 搜索 / 筛选 / 排序 / 分页）---- */
+function ledgerCard(type){
+  const ui=state.ui[type];
+  const total=byType(type).length;
+  const titles={ material:'📦 标准物质台账', gas:'📋 气瓶清单', equipment:'🔧 标准设备台账' };
+  const card=cardEl(titles[type]+`　(${total})`, [btn('➕ 新建','btn-sm btn-green',()=>openItemDlg(null,type))]);
+  const head=card.querySelector('.card-title');
+  const tg=document.createElement('button'); tg.className='collapse-btn'; tg.textContent=ui.open?'▼':'▶';
+  tg.title=ui.open?'收起':'展开';
+  tg.onclick=()=>{ ui.open=!ui.open; saveUI(); renderPane(); };
+  head.insertBefore(tg, head.firstChild);
+
+  const sum=document.createElement('div'); sum.className='stat-line'; sum.textContent=statLine(type);
+  card.appendChild(sum);
+
+  const body=document.createElement('div'); card.appendChild(body);
+  const paint=()=>{ body.innerHTML=''; if(ui.open) body.appendChild(ledgerBody(type, paint)); };
+  paint();
+  return card;
+}
+function ledgerBody(type, repaint){
+  const ui=state.ui[type];
+  const wrap=document.createElement('div');
+
+  const fb=document.createElement('div'); fb.className='filter-bar';
+  const si=document.createElement('input'); si.type='search'; si.value=ui.q||'';
+  si.placeholder='🔍 编号 / 名称 / GBW / 批号 / 位置 / 备注';
+  let tmr;
+  si.addEventListener('input',()=>{ clearTimeout(tmr); tmr=setTimeout(()=>{ ui.q=si.value; ui.pg=1; repaint(); },180); });
+  fb.appendChild(si);
+  FILTERS[type].forEach(([k,l])=>{
+    const c=document.createElement('button'); c.className='chip'+(ui.st===k?' on':''); c.textContent=l;
+    c.onclick=()=>{ ui.st=k; ui.pg=1; repaint(); };
+    fb.appendChild(c);
+  });
+  const ps=document.createElement('select'); ps.className='mini';
+  [50,100,200,500,1000].forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n+' 条/页'; if(ui.ps===n) o.selected=true; ps.appendChild(o); });
+  ps.onchange=()=>{ ui.ps=Number(ps.value); ui.pg=1; saveUI(); repaint(); };
+  fb.appendChild(ps);
+  wrap.appendChild(fb);
+
+  const list=filtered(type);
+  const total=list.length, pages=Math.max(1,Math.ceil(total/ui.ps));
+  if(ui.pg>pages) ui.pg=pages;
+  const start=(ui.pg-1)*ui.ps, rows=list.slice(start,start+ui.ps);
+
+  const cnt=document.createElement('div'); cnt.className='hint'; cnt.style.marginBottom='8px';
+  cnt.textContent = total ? `共 ${total} 条，当前第 ${start+1}–${Math.min(start+ui.ps,total)} 条　·　点表头可排序` : '没有匹配的记录';
+  wrap.appendChild(cnt);
+
+  const sc=document.createElement('div'); sc.className='table-scroll';
+  const tb=document.createElement('table');
+  const thead=document.createElement('thead'); const hr=document.createElement('tr');
+  COLS[type].forEach(col=>{
+    const th=document.createElement('th');
+    th.textContent = col.l + (ui.sk===col.k ? (ui.sd===1?' ▲':' ▼') : '');
+    if(ui.sk===col.k) th.style.color='#1e40af';
+    th.style.cursor='pointer'; th.title='点击排序';
+    th.onclick=()=>{ if(ui.sk===col.k) ui.sd=-(ui.sd||1); else { ui.sk=col.k; ui.sd=1; } ui.pg=1; repaint(); };
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr); tb.appendChild(thead);
+  const tbody=document.createElement('tbody');
+  if(!rows.length){
+    const tr=document.createElement('tr'), td=document.createElement('td');
+    td.colSpan=COLS[type].length; td.className='empty-tip'; td.textContent='没有匹配的记录';
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+  rows.forEach(it=>tbody.appendChild(ledgerRow(type,it)));
+  tb.appendChild(tbody); sc.appendChild(tb); wrap.appendChild(sc);
+
+  if(pages>1){
+    const pg=document.createElement('div'); pg.className='pager';
+    const mk=(t,dis,fn)=>{ const b=document.createElement('button'); b.className='btn-sm btn-blue'; b.textContent=t;
+      b.disabled=!!dis; if(dis){ b.style.opacity='.45'; b.style.cursor='not-allowed'; } b.onclick=fn; return b; };
+    pg.appendChild(mk('‹ 上一页', ui.pg<=1, ()=>{ ui.pg--; repaint(); }));
+    const jp=document.createElement('input'); jp.type='number'; jp.min='1'; jp.max=String(pages); jp.value=String(ui.pg);
+    jp.className='mini'; jp.style.width='72px';
+    jp.onchange=()=>{ const n=Math.max(1,Math.min(pages,Number(jp.value)||1)); ui.pg=n; repaint(); };
+    const lab=document.createElement('span'); lab.textContent='第'; 
+    const lab2=document.createElement('span'); lab2.textContent=' / '+pages+' 页';
+    pg.append(lab, jp, lab2);
+    pg.appendChild(mk('下一页 ›', ui.pg>=pages, ()=>{ ui.pg++; repaint(); }));
+    wrap.appendChild(pg);
+  }
+  return wrap;
+}
+function ledgerRow(type, it){
+  const st=itemStatus(it), es=expiryState(it), tr=document.createElement('tr');
+  if(es.level==='expired') tr.className='row-expired';
+  else if(stockOut(it)) tr.className='row-out';
+  else if(isBorrowed(it.id)) tr.className='row-unreturn';
+  COLS[type].forEach(col=>{
+    const td=document.createElement('td');
+    if(col.k==='_st'){ const b=document.createElement('span'); b.className='badge '+st.cls; b.textContent=st.txt; td.appendChild(b); }
+    else if(col.k==='_op'){
+      const can=canTake(it);
+      const takeB=document.createElement('button');
+      takeB.className='btn-sm '+(can?'btn-green':'btn-blue');
+      takeB.textContent = can ? (type==='equipment'?'📤 借出':'📤 领用') : '📥 归还';
+      if(!can && !isBorrowed(it.id)){ takeB.disabled=true; takeB.style.opacity='.4'; takeB.style.cursor='not-allowed'; }
+      takeB.onclick=()=>{ if(can) openBorrow(it.id);
+        else { const l=state.loans.find(x=>x.item_id===it.id&&x.kind==='borrow'&&!x.return_at); if(l) openReturn(l); } };
+      const edB=document.createElement('button'); edB.className='btn-icon'; edB.textContent='✏️'; edB.title='编辑'; edB.onclick=()=>openItemDlg(it);
+      td.append(takeB,edB);
+    }
+    else if(col.k==='qty'){
+      if(it.need_return){ const s=document.createElement('span'); s.className='badge b-return'; s.textContent='需归还'; td.appendChild(s); }
+      else { const s=document.createElement('span'); s.className='qty '+(Number(it.qty)<=0?'zero':Number(it.qty)<=1?'low':''); s.textContent=it.qty; td.appendChild(s); }
+    }
+    else if(col.k==='need_return'){
+      const s=document.createElement('span'); s.className='badge '+(it.need_return?'b-return':'b-ok'); s.textContent=it.need_return?'需归还':'消耗'; td.appendChild(s);
+    }
+    else if(col.k==='amount'){
+      const s=document.createElement('span');
+      s.style.cssText=`display:inline-block;min-width:48px;padding:2px 9px;border-radius:20px;color:#0f172a;font-weight:700;background:${gradient(it.amount)}`;
+      s.textContent=it.amount+'%'; td.appendChild(s);
+    }
+    else if(col.k==='cabinet'){ td.textContent=CABINETS[it.cabinet]?CABINETS[it.cabinet].name:'—'; }
+    else if(col.k==='expiry'){
+      td.className='mono'; td.textContent=it.expiry||'—';
+      if(es.level==='expired') td.style.color='#b91c1c'; else if(es.level==='soon') td.style.color='#b45309';
+    }
+    else { td.textContent=it[col.k]||'—'; }
+    tr.appendChild(td);
+  });
+  return tr;
+}
+
+/* ---- 快速领用卡（搜索优先，适合几百条场景）---- */
+function takeCard(type){
+  const isMat = type==='material';
+  const ui=state.ui[type];
+  const c=cardEl(isMat ? '📤 领用登记（默认消耗，库存减 1）' : '📤 设备借出登记（必须归还，不记余量）');
+  const _head=c.querySelector('.card-title');
+  const _tg=document.createElement('button'); _tg.className='collapse-btn'; _tg.textContent='▼'; _tg.title='收起 / 展开';
+  _tg.onclick=()=>{ const b=c.querySelector('.take-body'); const o=b.style.display!=='none'; b.style.display=o?'none':'block'; _tg.textContent=o?'▶':'▼'; };
+  _head.insertBefore(_tg, _head.firstChild);
+  const _body=document.createElement('div'); _body.className='take-body';
+
+  const row=document.createElement('div'); row.className='form-row';
+  const g1=document.createElement('div'); g1.className='form-group'; g1.style.flex='2';
+  const l1=document.createElement('label'); l1.textContent='🔍 搜索';
+  const si=document.createElement('input'); si.id='takeSearch'; si.value=ui.tk||'';
+  si.placeholder=isMat?'输入「铅」「GBW(E)080215」「A-2」快速定位':'输入设备名 / 编号 / 型号';
+  g1.append(l1,si);
+  const g2=document.createElement('div'); g2.className='form-group'; g2.style.flex='3';
+  const l2=document.createElement('label'); l2.textContent=isMat?'🧪 选择标准物质':'🔧 选择设备';
+  const sel=document.createElement('select'); sel.id='takeSelect';
+  g2.append(l2,sel);
+  row.append(g1,g2); _body.appendChild(row);
+
+  const info=document.createElement('div'); info.className='pick-info'; _body.appendChild(info);
+
+  const row2=document.createElement('div'); row2.className='form-row'; row2.style.marginBottom='4px';
+  const gw=document.createElement('div'); gw.className='form-group';
+  const lw=document.createElement('label'); lw.textContent='🧑‍💼 领用人';
+  const wi=document.createElement('input'); wi.id='takeWho'; wi.setAttribute('list','staffList'); wi.value=(state.me&&state.me.name)||'';
+  gw.append(lw,wi);
+  const gq=document.createElement('div'); gq.className='form-group'; gq.style.flex='0 0 110px';
+  if(!isMat) gq.style.display='none';
+  const lq=document.createElement('label'); lq.textContent='数量';
+  const qi=document.createElement('input'); qi.type='number'; qi.min='1'; qi.value='1'; qi.id='takeQty';
+  gq.append(lq,qi);
+  const gr=document.createElement('div'); gr.className='form-group'; gr.style.flex='2';
+  const lr=document.createElement('label'); lr.textContent='📋 用途 / 备注';
+  const ri=document.createElement('input'); ri.id='takeRemark'; ri.placeholder='例：HJ 636 总氮测定';
+  gr.append(lr,ri);
+  const gb=document.createElement('div'); gb.className='form-group'; gb.style.flex='0 0 auto'; gb.style.minWidth='130px';
+  const go=document.createElement('button'); go.textContent=isMat?'✅ 领用':'✅ 借出'; go.style.width='100%'; go.onclick=doTake;
+  gb.appendChild(go);
+  row2.append(gw,gq,gr,gb); _body.appendChild(row2);
+
+  const upd=()=>{
+    const it=findItem(sel.value);
+    if(!it){ info.style.display='none'; return; }
+    const es=expiryState(it), bits=[`${it.code} · ${it.name}`];
+    if(it.value) bits.push(it.value);
+    if(isMat && !it.need_return) bits.push(`库存 ${it.qty}`);
+    bits.push('位置 '+posLabel(it));
+    if(it.expiry) bits.push(`有效期 ${it.expiry}${es.text?'（'+es.text+'）':''}`);
+    info.textContent='📌 '+bits.join('　｜　');
+    info.className='pick-info'+(es.level==='expired'?' warn':es.level==='soon'?' soon':'');
+    info.style.display='block';
+  };
+  const fill=()=>{
     const q=(si.value||'').trim().toLowerCase();
     const list=byType(type).filter(i=>canTake(i))
-      .filter(i=>!q||[i.code,i.name,i.gbwno,i.batch,i.uncert].join(' ').toLowerCase().includes(q));
+      .filter(i=>!q||[i.code,i.name,i.gbwno,i.batch,i.value,i.uncert,i.location,i.position].join(' ').toLowerCase().includes(q));
+    const keep=(ui.sel && list.some(i=>i.id===ui.sel)) ? ui.sel : null;
     sel.innerHTML='';
-    if(!list.length){ const o=document.createElement('option'); o.value=''; o.textContent='（暂无可领用项）'; sel.appendChild(o); return; }
-    list.forEach(i=>{
+    if(!list.length){ const o=document.createElement('option'); o.value=''; o.textContent='（无可领用项）'; sel.appendChild(o); upd(); return; }
+    const shown=list.slice(0,200);
+    shown.forEach(i=>{
       const o=document.createElement('option'); o.value=i.id;
-      const tail = type==='material' ? (i.need_return?' · 需归还':' · 库存'+i.qty) : (i.uncert?' · '+i.uncert:'');
+      const tail = isMat ? (i.need_return?' · 需归还':' · 库存'+i.qty) : (i.uncert?' · '+i.uncert:'');
       o.textContent=`${i.code} · ${i.name}${i.value?' · '+i.value:''}${tail}`;
       sel.appendChild(o);
     });
+    if(list.length>shown.length){
+      const o=document.createElement('option'); o.disabled=true;
+      o.textContent=`…还有 ${list.length-shown.length} 条匹配，请继续输入关键词缩小范围`;
+      sel.appendChild(o);
+    }
+    if(keep && shown.some(i=>i.id===keep)) sel.value=keep;
+    upd();
   };
-  go(); si.addEventListener('input', go);
+  si.addEventListener('input',fill);
+  sel.addEventListener('change',upd);
+  [wi,ri].forEach(el=>el.addEventListener('keydown',e=>{ if(e.key==='Enter') doTake(); }));
+  fill();
+  c.appendChild(_body);
+  return c;
+}
+function doTake(){
+  const id=$('#takeSelect').value;
+  if(!id){ toast('请先选择条目'); return; }
+  const it=findItem(id); if(!it) return;
+  const who=($('#takeWho').value||'').trim();
+  if(!who){ toast('请填写领用人'); $('#takeWho').focus(); return; }
+  const qty=Math.max(1, Math.floor(Number($('#takeQty').value)||1));
+  if(it.type==='material' && !it.need_return && qty>Number(it.qty||0)){ toast('领用数量超过库存（'+it.qty+'）'); return; }
+  makeLoan(it, who, qty, ($('#takeRemark').value||'').trim());
+  $('#takeRemark').value=''; $('#takeQty').value='1';
+  renderAll();
+}
+function makeLoan(it, who, qty, remark){
+  const consume = it.type==='material' && !it.need_return;
+  const now=new Date().toISOString();
+  const loan={ id:uid(), item_id:it.id, code:it.code, name:it.name, batch:it.batch||'',
+    item_type:it.type, kind:consume?'consume':'borrow', borrower:who, borrow_at:now,
+    remark:remark||'', qty:consume?qty:1, return_at:consume?now:null, remain:null, return_note:'' };
+  if(consume){ it.qty=Number(it.qty)-qty; push(it); }
+  pushLoan(loan);
+  toast(consume ? `已领用 ${it.code} ×${qty}，剩余库存 ${it.qty}` : `已借出 ${it.code} → ${who}`);
+  return loan;
 }
 
-/* 领用登记卡（物质/设备共用） */
-function paneMaterial(){
-  const frag=document.createDocumentFragment();
-  const c=cardEl('📤 领用登记（默认消耗，库存减 1）');
-  const row=document.createElement('div'); row.className='form-row';
-  const g1=document.createElement('div'); g1.className='form-group'; g1.style.flex='2';
-  g1.innerHTML='<label>🔍 搜索</label>'; const si=document.createElement('input'); si.placeholder='编号 / 名称 / GBW / 批号'; si.id='matSearch'; g1.appendChild(si);
-  const g2=document.createElement('div'); g2.className='form-group'; g2.style.flex='3';
-  g2.innerHTML='<label>🧪 选择标准物质</label>'; const sel=document.createElement('select'); sel.id='matSelect'; g2.appendChild(sel);
-  row.append(g1,g2); c.appendChild(row);
-  fillPick(sel, si, 'material');
-  const row2=document.createElement('div'); row2.className='form-row';
-  const g3=document.createElement('div'); g3.className='form-group'; g3.style.flex='0 0 auto'; g3.style.minWidth='130px';
-  const b=document.createElement('button'); b.textContent='✅ 领用'; b.style.width='100%'; b.onclick=()=>{ const id=$('#matSelect').value; if(id) openBorrow(id); else toast('请选择标准物质'); };
-  g3.appendChild(b); row2.appendChild(g3); c.appendChild(row2);
-  frag.appendChild(c);
-
-  const t=cardEl('📦 标准物质台账', [btn('➕ 新建','btn-sm btn-green',()=>openItemDlg(null,'material'))]);
-  const wrap=document.createElement('div'); wrap.style.overflowX='auto';
-  const tb=document.createElement('table');
-  tb.innerHTML='<thead><tr><th>编号</th><th>名称</th><th>GBW 号</th><th>批号</th><th>标准值</th><th>规格</th><th>有效期</th><th>位置</th><th>库存</th><th>归还</th><th>状态</th><th>操作</th></tr></thead>';
-  const body=document.createElement('tbody');
-  const list=byType('material');
-  if(!list.length) body.innerHTML='<tr><td colspan="12" class="empty-tip">暂无标准物质</td></tr>';
-  list.forEach(it=>{
-    const st=itemStatus(it), es=expiryState(it), tr=document.createElement('tr');
-    if(es.level==='expired') tr.className='row-expired'; else if(stockOut(it)) tr.className='row-out';
-    [it.code,it.name,it.gbwno,it.batch,it.value,it.spec].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const tdE=document.createElement('td'); tdE.className='mono'; tdE.textContent=it.expiry||'—';
-    if(es.level==='expired') tdE.style.color='#b91c1c'; else if(es.level==='soon') tdE.style.color='#b45309';
-    tr.appendChild(tdE);
-    const tdL=document.createElement('td'); tdL.textContent=it.location||'—'; tr.appendChild(tdL);
-    const tdQ=document.createElement('td');
-    if(it.need_return){ tdQ.innerHTML='<span class="badge b-ok">—</span>'; }
-    else { const s=document.createElement('span'); s.className='qty '+(Number(it.qty)<=0?'zero':Number(it.qty)<=1?'low':''); s.textContent=it.qty; tdQ.appendChild(s); }
-    tr.appendChild(tdQ);
-    const tdR=document.createElement('td');
-    const rb=document.createElement('span'); rb.className='badge '+(it.need_return?'b-return':'b-ok'); rb.textContent=it.need_return?'需归还':'消耗';
-    tdR.appendChild(rb); tr.appendChild(tdR);
-    const tdS=document.createElement('td'); const bb=document.createElement('span'); bb.className='badge '+st.cls; bb.textContent=st.txt; tdS.appendChild(bb); tr.appendChild(tdS);
-    const tdO=document.createElement('td');
-    const takeB=document.createElement('button'); takeB.className='btn-sm btn-green'; takeB.textContent='📤 领用';
-    takeB.disabled=!canTake(it); if(!canTake(it)){ takeB.style.opacity='.4'; takeB.style.cursor='not-allowed'; }
-    takeB.onclick=()=>openBorrow(it.id);
-    const edB=document.createElement('button'); edB.className='btn-icon'; edB.textContent='✏️'; edB.title='编辑'; edB.onclick=()=>openItemDlg(it);
-    tdO.append(takeB,edB); tr.appendChild(tdO);
-    body.appendChild(tr);
-  });
-  tb.appendChild(body); wrap.appendChild(tb); t.appendChild(wrap); frag.appendChild(t);
-  return frag;
-}
-function paneEquipment(){
-  const frag=document.createDocumentFragment();
-  const c=cardEl('📤 设备借出登记（必须归还，不记余量）');
-  const row=document.createElement('div'); row.className='form-row';
-  const g1=document.createElement('div'); g1.className='form-group'; g1.style.flex='2';
-  g1.innerHTML='<label>🔍 搜索</label>'; const si=document.createElement('input'); si.placeholder='编号 / 名称 / 型号'; si.id='eqSearch'; g1.appendChild(si);
-  const g2=document.createElement('div'); g2.className='form-group'; g2.style.flex='3';
-  g2.innerHTML='<label>🔧 选择设备</label>'; const sel=document.createElement('select'); sel.id='eqSelect'; g2.appendChild(sel);
-  row.append(g1,g2); c.appendChild(row);
-  fillPick(sel, si, 'equipment');
-  const row2=document.createElement('div'); row2.className='form-row';
-  const g3=document.createElement('div'); g3.className='form-group'; g3.style.flex='0 0 auto'; g3.style.minWidth='130px';
-  const b=document.createElement('button'); b.textContent='✅ 借出'; b.style.width='100%'; b.onclick=()=>{ const id=$('#eqSelect').value; if(id) openBorrow(id); else toast('请选择设备'); };
-  g3.appendChild(b); row2.appendChild(g3); c.appendChild(row2);
-  frag.appendChild(c);
-
-  const t=cardEl('🔧 标准设备台账', [btn('➕ 新建','btn-sm btn-green',()=>openItemDlg(null,'equipment'))]);
-  const wrap=document.createElement('div'); wrap.style.overflowX='auto';
-  const tb=document.createElement('table');
-  tb.innerHTML='<thead><tr><th>编号</th><th>名称</th><th>型号</th><th>资产号</th><th>校准有效期</th><th>位置</th><th>状态</th><th>操作</th></tr></thead>';
-  const body=document.createElement('tbody'); const list=byType('equipment');
-  if(!list.length) body.innerHTML='<tr><td colspan="8" class="empty-tip">暂无标准设备</td></tr>';
-  list.forEach(it=>{
-    const st=itemStatus(it), es=expiryState(it), tr=document.createElement('tr');
-    if(es.level==='expired') tr.className='row-expired';
-    [it.code,it.name,it.uncert,it.batch].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const tdE=document.createElement('td'); tdE.className='mono'; tdE.textContent=it.expiry||'—';
-    if(es.level==='expired') tdE.style.color='#b91c1c'; else if(es.level==='soon') tdE.style.color='#b45309';
-    tr.appendChild(tdE);
-    const tdL=document.createElement('td'); tdL.textContent=it.location||'—'; tr.appendChild(tdL);
-    const tdS=document.createElement('td'); const bb=document.createElement('span'); bb.className='badge '+st.cls; bb.textContent=st.txt; tdS.appendChild(bb); tr.appendChild(tdS);
-    const tdO=document.createElement('td');
-    const takeB=document.createElement('button'); takeB.className='btn-sm btn-green'; takeB.textContent='📤 借出';
-    takeB.disabled=!canTake(it); if(!canTake(it)){ takeB.style.opacity='.4'; takeB.style.cursor='not-allowed'; }
-    takeB.onclick=()=>openBorrow(it.id);
-    const edB=document.createElement('button'); edB.className='btn-icon'; edB.textContent='✏️'; edB.onclick=()=>openItemDlg(it);
-    tdO.append(takeB,edB); tr.appendChild(tdO);
-    body.appendChild(tr);
-  });
-  tb.appendChild(body); wrap.appendChild(tb); t.appendChild(wrap); frag.appendChild(t);
-  return frag;
-}
-function paneGas(){
-  const frag=document.createDocumentFragment();
+/* ---- 气瓶柜位图 ---- */
+function gasGridCard(){
   const c=cardEl('🔥 气瓶柜位图（点击格子领用 / 归还）', [btn('➕ 新建气瓶','btn-sm btn-green',()=>openItemDlg(null,'gas'))]);
   const lg=document.createElement('div'); lg.className='legend';
-  lg.innerHTML = '<span>余量</span><span>0%</span><span class="bar"></span><span>100%</span>'
-    + '<span style="margin-left:14px;"><span class="sw" style="background:#e2e8f0"></span>借出中</span>'
-    + '<span><span class="sw" style="background:#fbfcfe"></span>空位</span>';
+  lg.innerHTML='<span>余量</span><span>0%</span><span class="bar"></span><span>100%</span>'
+    +'<span style="margin-left:14px;"><span class="sw" style="background:#e2e8f0"></span>借出中</span>'
+    +'<span><span class="sw" style="background:#fbfcfe"></span>空位</span>';
   c.appendChild(lg);
-  const gases = byType('gas');
+  const gases=byType('gas');
   let any=false;
   Object.entries(CABINETS).forEach(([key,cfg])=>{
-    const inCab = gases.filter(g=>g.cabinet===key);
+    const inCab=gases.filter(g=>g.cabinet===key);
     if(!inCab.length) return;
     any=true;
     const sec=document.createElement('div'); sec.className='gas-cabinet-section';
     const title=document.createElement('div'); title.className='gas-cabinet-title';
-    title.textContent = `${cfg.name}（${cfg.prefix}柜）`;
+    title.textContent=`${cfg.name}（${cfg.prefix}柜）`;
     const tip=document.createElement('span'); tip.className='tip'; tip.textContent=`${inCab.length} 瓶在用 · 点击格子操作`;
     title.appendChild(tip); sec.appendChild(title);
     const gc=document.createElement('div'); gc.className='gas-grid-container';
     const tb=document.createElement('table'); tb.className='gas-grid';
-    const thead=document.createElement('thead'); const hr=document.createElement('tr');
+    const thead=document.createElement('thead'), hr=document.createElement('tr');
     hr.appendChild(document.createElement('th'));
     const letters=[]; for(let i=0;i<cfg.cols;i++) letters.push(String.fromCharCode(cfg.colStart.charCodeAt(0)+i));
     letters.forEach(L=>{ const th=document.createElement('th'); th.textContent=L; hr.appendChild(th); });
@@ -748,14 +1041,14 @@ function paneGas(){
         const td=document.createElement('td');
         if(!g){ td.className='gas-cell-empty'; td.textContent='·'; td.title=`${cfg.name} ${pos}（空位）`; tr.appendChild(td); return; }
         const borrowed=isBorrowed(g.id);
-        const loan = borrowed ? state.loans.find(l=>l.item_id===g.id && l.kind==='borrow' && !l.return_at) : null;
+        const loan=borrowed?state.loans.find(l=>l.item_id===g.id&&l.kind==='borrow'&&!l.return_at):null;
         if(borrowed) td.className='gas-cell-borrowed'; else td.style.background=gradient(g.amount);
         const p=document.createElement('span'); p.className='gas-cell-text'; p.textContent=pos; td.appendChild(p);
         const n=document.createElement('span'); n.className='gas-cell-detail'; n.textContent=g.name||'-'; td.appendChild(n);
         if(g.value){ const v=document.createElement('span'); v.className='gas-cell-detail'; v.textContent=g.value; td.appendChild(v); }
         const pc=document.createElement('span'); pc.className='gas-cell-detail'; pc.textContent=`余量 ${g.amount}%`; td.appendChild(pc);
-        if(borrowed && loan){ const s=document.createElement('span'); s.className='gas-cell-borrower'; s.textContent='领用:'+loan.borrower; td.appendChild(s); }
-        td.title = `${cfg.name} ${pos}\n${g.name}\n浓度: ${g.value||'-'}\n余量: ${g.amount}%\n状态: ${borrowed?('借出 - '+loan.borrower):'在库'}${g.expiry?('\n有效期: '+g.expiry):''}`;
+        if(borrowed&&loan){ const s=document.createElement('span'); s.className='gas-cell-borrower'; s.textContent='领用:'+loan.borrower; td.appendChild(s); }
+        td.title=`${cfg.name} ${pos}\n${g.name}\n浓度: ${g.value||'-'}\n余量: ${g.amount}%\n状态: ${borrowed?('借出 - '+loan.borrower):'在库'}${g.expiry?('\n有效期: '+g.expiry):''}`;
         td.onclick=()=>{ if(borrowed) openReturn(loan); else openBorrow(g.id); };
         tr.appendChild(td);
       });
@@ -764,34 +1057,7 @@ function paneGas(){
     tb.appendChild(tbody); gc.appendChild(tb); sec.appendChild(gc); c.appendChild(sec);
   });
   if(!any){ const em=document.createElement('div'); em.className='empty-tip'; em.textContent='还没有气瓶，点右上角「新建气瓶」录入柜体与柜位'; c.appendChild(em); }
-  frag.appendChild(c);
-
-  const t=cardEl('📋 气瓶清单');
-  const wrap=document.createElement('div'); wrap.style.overflowX='auto';
-  const tb2=document.createElement('table');
-  tb2.innerHTML='<thead><tr><th>编号</th><th>气体名称</th><th>浓度</th><th>柜体</th><th>柜位</th><th>余量</th><th>有效期</th><th>状态</th><th>操作</th></tr></thead>';
-  const body=document.createElement('tbody');
-  if(!gases.length) body.innerHTML='<tr><td colspan="9" class="empty-tip">暂无气瓶</td></tr>';
-  gases.forEach(it=>{
-    const st=itemStatus(it), tr=document.createElement('tr');
-    [it.code,it.name,it.value].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const c1=document.createElement('td'); c1.textContent=CABINETS[it.cabinet]?CABINETS[it.cabinet].name:'—'; tr.appendChild(c1);
-    const c2=document.createElement('td'); c2.textContent=it.position||'—'; tr.appendChild(c2);
-    const c3=document.createElement('td');
-    const bar=document.createElement('span');
-    bar.style.cssText=`display:inline-block;min-width:52px;padding:2px 9px;border-radius:20px;color:#0f172a;font-weight:700;background:${gradient(it.amount)}`;
-    bar.textContent=it.amount+'%'; c3.appendChild(bar); tr.appendChild(c3);
-    const c4=document.createElement('td'); c4.className='mono'; c4.textContent=it.expiry||'—'; tr.appendChild(c4);
-    const c5=document.createElement('td'); const bb=document.createElement('span'); bb.className='badge '+st.cls; bb.textContent=st.txt; c5.appendChild(bb); tr.appendChild(c5);
-    const c6=document.createElement('td');
-    const takeB=document.createElement('button'); takeB.className='btn-sm btn-green'; takeB.textContent=canTake(it)?'📤 领用':'📥 归还';
-    takeB.onclick=()=>{ if(canTake(it)) openBorrow(it.id); else { const l=state.loans.find(x=>x.item_id===it.id&&x.kind==='borrow'&&!x.return_at); if(l) openReturn(l); } };
-    const edB=document.createElement('button'); edB.className='btn-icon'; edB.textContent='✏️'; edB.onclick=()=>openItemDlg(it);
-    c6.append(takeB,edB); tr.appendChild(c6);
-    body.appendChild(tr);
-  });
-  tb2.appendChild(body); wrap.appendChild(tb2); t.appendChild(wrap); frag.appendChild(t);
-  return frag;
+  return c;
 }
 
 /* 待归还 / 预警 / 历史 */
@@ -891,11 +1157,9 @@ function confirmBorrow(){
     borrower:who, borrow_at:now, remark, qty,
     return_at: consume ? now : null, remain:null, return_note:'',
   };
-  if(consume){ it.qty = Number(it.qty) - qty; push(it); }
-  pushLoan(loan);
+  makeLoan(it, who, qty, remark);
   $('#borrowDlg').close();
   renderAll();
-  toast(consume ? `已领用 ${it.code} ×${qty}，剩余库存 ${it.qty}` : `已借出 ${it.code} → ${who}`);
 }
 function openReturn(l){
   if(!l) return;
@@ -1196,7 +1460,7 @@ function bind(){
 
 /* ================= 启动 ================= */
 function boot(){
-  loadCfg(); ensureName(); bind();
+  loadCfg(); ensureName(); state.ui=loadUI(); bind();
   try{ state.tab = localStorage.getItem(LS_TAB) || 'material'; }catch(e){ state.tab='material'; }
   state.mode = (state.cfg.url&&state.cfg.key) ? 'cloud' : 'local';
   if(state.mode==='local'){ localLoad(); renderAll(); }
