@@ -376,7 +376,7 @@
     <div class="dlg-f">
         <button type="button" class="btn-sm btn-red" id="deleteItemBtn" style="display:none;">🗑️ 删除</button>
         <button type="button" class="btn-sm btn-blue" id="cancelItemBtn">取消</button>
-        <button type="button" id="saveItemBtn">💾 保存</button>
+        <button type="button" id="saveItemBtn">💾 保存（需密码）</button>
     </div>
 </dialog>
 
@@ -1245,6 +1245,7 @@ function syncTypeFields(){
   if(qg) qg.style.display = (t==='material') ? 'block' : 'none';
 }
 function saveItem(){
+  if(!askPwd()){ toast('密码错误，无法保存'); return; }
   const t=$('#f_type').value;
   const code=$('#f_code').value.trim(), name=$('#f_name').value.trim();
   if(!code||!name){ toast('编号和名称必填'); return; }
