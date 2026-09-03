@@ -285,7 +285,7 @@
         <div class="footer-note">
             🧪 标准物质：默认消耗型，领用即从库存减 1；勾选「需归还」的少数物质走借用流程<br>
             🔥 标准气体：必须归还，按柜位展示，单元格颜色随余量由红(0%)渐变至绿(100%)<br>
-            🔧 标准设备：必须归还，不记录余量　·　⚙️ 实时云端同步 | 无云配置时存本机 | 删除与导入需密码(114514)
+            🔧 标准设备：必须归还，不记录余量　·　⚙️ 实时云端同步 | 无云配置时存本机
         </div>
     </div>
 </div>
@@ -376,7 +376,7 @@
     <div class="dlg-f">
         <button type="button" class="btn-sm btn-red" id="deleteItemBtn" style="display:none;">🗑️ 删除</button>
         <button type="button" class="btn-sm btn-blue" id="cancelItemBtn">取消</button>
-        <button type="button" id="saveItemBtn">💾 保存（需密码）</button>
+        <button type="button" id="saveItemBtn">💾 保存</button>
     </div>
 </dialog>
 
@@ -406,7 +406,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 const T_ITEM = 'crm_items';
 const T_LOAN = 'crm_loans';
 const LS_CFG='wbCrm.cfg.v1', LS_ME='wbCrm.me.v1', LS_ITEMS='wbCrm.items.v1', LS_LOANS='wbCrm.loans.v1', LS_TAB='wbCrm.tab.v1';
-const PWD = '114514';
 const SOON_DAYS = 30;     // 有效期预警阈值（天）：≤ 即预警
 const LOW_QTY = 3;        // 标准物质库存预警阈值：qty ≤ 即预警
 const LOW_AMOUNT = 15;    // 标准气体余量预警阈值(%)：amount ≤ 即预警
@@ -483,7 +482,6 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+
 
 let toastTimer;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
-function askPwd(){ return prompt('🔐 此操作需要密码验证','') === PWD; }
 function fmt(dt){ if(!dt) return ''; const d=new Date(dt); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function daysTo(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); if(isNaN(d)) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/86400000); }
@@ -1245,7 +1243,6 @@ function syncTypeFields(){
   if(qg) qg.style.display = (t==='material') ? 'block' : 'none';
 }
 function saveItem(){
-  if(!askPwd()){ toast('密码错误，无法保存'); return; }
   const t=$('#f_type').value;
   const code=$('#f_code').value.trim(), name=$('#f_name').value.trim();
   if(!code||!name){ toast('编号和名称必填'); return; }
@@ -1281,7 +1278,6 @@ function saveItem(){
 function deleteItem(){
   const id=$('#f_id').value, it=findItem(id); if(!it) return;
   if(isBorrowed(id)){ toast('该项处于借出状态，请先归还'); return; }
-  if(!askPwd()){ toast('密码错误'); return; }
   if(!confirm(`确认删除 ${it.code} ${it.name}？`)) return;
   state.items=state.items.filter(x=>x.id!==id); dropRow(T_ITEM,id);
   $('#itemDlg').close(); renderAll(); toast('已删除');
@@ -1291,7 +1287,6 @@ function batchDelete(){
   if(!ids.length){ toast('请先勾选'); return; }
   const busy=ids.filter(isBorrowed);
   if(busy.length){ toast(`有 ${busy.length} 项处于借出状态，请先归还`); return; }
-  if(!askPwd()){ toast('密码错误'); return; }
   if(!confirm(`确认删除选中的 ${ids.length} 项？`)) return;
   state.items=state.items.filter(x=>!ids.includes(x.id));
   ids.forEach(id=>dropRow(T_ITEM,id));
@@ -1379,7 +1374,6 @@ function doImport(file){
         });
       }).filter(x=>x.code&&x.name);
       if(!items.length){ toast('没有有效行（编号或名称为空）'); return; }
-      if(!askPwd()){ toast('密码错误'); return; }
       if(!confirm(`识别到 ${items.length} 条，导入将【覆盖】现有台账，继续？`)) return;
       const old=state.items.map(i=>i.id);
       state.items=items;
