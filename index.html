@@ -230,6 +230,9 @@
                 <button id="shareBtn" class="btn-sm btn-green">🔗 分享链接</button>
                 <button id="syncBtn" class="btn-sm btn-blue">☁️ 云同步</button>
                 <button id="nameBtn" class="btn-sm btn-blue">👤 我是谁</button>
+                <button id="backupBtn" class="btn-sm btn-green">💾 备份本机</button>
+                <button id="restoreBtn" class="btn-sm btn-blue">📂 恢复备份</button>
+                <input type="file" id="restoreFile" accept=".json,application/json" style="display:none;">
             </div>
         </div>
 
@@ -409,6 +412,8 @@ const LS_CFG='wbCrm.cfg.v1', LS_ME='wbCrm.me.v1', LS_ITEMS='wbCrm.items.v1', LS_
 const SOON_DAYS = 30;     // 有效期预警阈值（天）：≤ 即预警
 const LOW_QTY = 3;        // 标准物质库存预警阈值：qty ≤ 即预警
 const LOW_AMOUNT = 15;    // 标准气体余量预警阈值(%)：amount ≤ 即预警
+const ALLOWED_EDITOR = '妙蛙种子';   // 仅此用户可新增/修改/删除台账（领用/归还不受限）
+function canEdit(){ return !!(state.me && state.me.name === ALLOWED_EDITOR); }
 
 const TYPES = { material:'标准物质', gas:'标准气体', equipment:'标准设备' };
 const CABINETS = {
@@ -1243,6 +1248,7 @@ function syncTypeFields(){
   if(qg) qg.style.display = (t==='material') ? 'block' : 'none';
 }
 function saveItem(){
+  if(!canEdit()){ toast('无权限执行此操作'); return; }
   const t=$('#f_type').value;
   const code=$('#f_code').value.trim(), name=$('#f_name').value.trim();
   if(!code||!name){ toast('编号和名称必填'); return; }
@@ -1276,6 +1282,7 @@ function saveItem(){
   $('#itemDlg').close(); renderAll(); toast('已保存');
 }
 function deleteItem(){
+  if(!canEdit()){ toast('无权限执行此操作'); return; }
   const id=$('#f_id').value, it=findItem(id); if(!it) return;
   if(isBorrowed(id)){ toast('该项处于借出状态，请先归还'); return; }
   if(!confirm(`确认删除 ${it.code} ${it.name}？`)) return;
@@ -1283,6 +1290,7 @@ function deleteItem(){
   $('#itemDlg').close(); renderAll(); toast('已删除');
 }
 function batchDelete(){
+  if(!canEdit()){ toast('无权限执行此操作'); return; }
   const ids=[...document.querySelectorAll('.sel-item:checked')].map(b=>b.value);
   if(!ids.length){ toast('请先勾选'); return; }
   const busy=ids.filter(isBorrowed);
@@ -1342,6 +1350,7 @@ function guessCabinet(v){
   return '';
 }
 function doImport(file){
+  if(!canEdit()){ toast('无权限执行此操作'); return; }
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -1415,6 +1424,60 @@ function exportRecords(){
   toast('记录已导出');
 }
 
+/* ================= 一键备份 / 恢复 ================= */
+function backupAll(){
+  const snap={
+    _app:'wbCrm', _ver:2,
+    _exportedAt:new Date().toISOString(),
+    items:state.items, loans:state.loans,
+    cfg:state.cfg, me:state.me, tab:state.tab, ui:state.ui, mode:state.mode
+  };
+  const blob=new Blob([JSON.stringify(snap,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href=URL.createObjectURL(blob);
+  a.download=`标准物质台账备份_${ts}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('已备份全部数据到本机（JSON）');
+}
+async function applyRestore(data){
+  if(!data || !Array.isArray(data.items)){ toast('备份文件无效，无法恢复'); return; }
+  if(!canEdit()){ toast('无权限执行此操作'); return; }
+  if(!confirm(`恢复将【覆盖】当前全部台账与领用记录（现共 ${state.items.length} 条台账 / ${state.loans.length} 条记录），确定从备份恢复？`)) return;
+  try{
+    const newItems=(data.items||[]).map(normItem);
+    const newLoans=(data.loans||[]).map(normLoan);
+    if(state.mode==='cloud' && state.sb){
+      const [ci,cl]=await Promise.all([state.sb.from(T_ITEM).select('id'), state.sb.from(T_LOAN).select('id')]);
+      const delI=(ci.data||[]).map(r=>r.id), delL=(cl.data||[]).map(r=>r.id);
+      if(delI.length){ const r=await state.sb.from(T_ITEM).delete().in('id',delI); if(r.error) throw r.error; }
+      if(delL.length){ const r=await state.sb.from(T_LOAN).delete().in('id',delL); if(r.error) throw r.error; }
+      const CH=200;
+      for(let i=0;i<newItems.length;i+=CH){ const r=await state.sb.from(T_ITEM).upsert(newItems.slice(i,i+CH).map(rowOf)); if(r.error) throw r.error; }
+      for(let i=0;i<newLoans.length;i+=CH){ const r=await state.sb.from(T_LOAN).upsert(newLoans.slice(i,i+CH).map(loanRowOf)); if(r.error) throw r.error; }
+    }
+    state.items=newItems; state.loans=newLoans; localSave();
+    if(data.cfg){ state.cfg=Object.assign({url:'',key:''},data.cfg); saveCfg(); }
+    if(data.me){ state.me=data.me; try{ localStorage.setItem(LS_ME,JSON.stringify(state.me)); }catch(e){} }
+    if(data.tab){ state.tab=data.tab; try{ localStorage.setItem(LS_TAB,state.tab); }catch(e){} }
+    if(data.ui && typeof data.ui==='object'){ state.ui=data.ui; saveUI(); }
+    renderAll();
+    toast(`已恢复 ${newItems.length} 条台账 / ${newLoans.length} 条记录`);
+  }catch(err){ toast('恢复失败：'+((err&&err.message)||err)); }
+}
+function restoreFromFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data || typeof data!=='object' || !Array.isArray(data.items)){ toast('不是有效的备份文件'); return; }
+      applyRestore(data);
+    }catch(err){ toast('解析失败：'+(err.message||err)); }
+  };
+  reader.readAsText(file);
+}
+
 /* ================= 绑定 ================= */
 function bind(){
   $('#collapseToggle').onclick=()=>{
@@ -1437,6 +1500,9 @@ function bind(){
   $('#importFile').onchange=e=>{ if(e.target.files[0]) doImport(e.target.files[0]); e.target.value=''; };
   $('#exportItemBtn').onclick=exportItems;
   $('#exportRecBtn').onclick=exportRecords;
+  $('#backupBtn').onclick=backupAll;
+  $('#restoreBtn').onclick=()=>$('#restoreFile').click();
+  $('#restoreFile').onchange=e=>{ if(e.target.files[0]) restoreFromFile(e.target.files[0]); e.target.value=''; };
 
   $('#confirmBorrowBtn').onclick=confirmBorrow;
   $('#cancelBorrowBtn').onclick=()=>$('#borrowDlg').close();
