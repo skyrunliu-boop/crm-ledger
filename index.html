@@ -656,7 +656,7 @@ function renderConn(){
     : state.conn==='error' ? ('连接失败：'+state.errMsg) : '连接中…';
   txt.title = state.errMsg||'';
 }
-function renderAll(){ renderCounts(); renderPanel(); renderPane(); renderUnreturn(); renderExpiry(); renderHistory(); renderAlert(); renderConn(); }
+function renderAll(){ renderCounts(); renderPanel(); renderPane(); renderUnreturn(); renderExpiry(); renderHistory(); renderAlert(); renderWarnTicker(); renderConn(); }
 function renderCounts(){
   ['material','gas','equipment'].forEach(t=>{ const el=$('#cnt-'+t); if(el) el.textContent = state.items.filter(i=>i.type===t).length; });
 }
