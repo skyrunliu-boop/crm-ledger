@@ -1,12 +1,15 @@
 name: Keep Supabase Alive
 on:
   schedule:
-    - cron: '23 3 */3 * *'      # 每 3 天 UTC 03:23 自动访问一次，防止免费库被暂停 / 删除
+    - cron: '23 3 */3 * *'      # 每 3 天 UTC 03:23 自动运行，防止 Supabase 免费库被暂停 / 删除
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Ping Supabase REST API
         run: |
           curl -s -o /dev/null -w "HTTP %{http_code}\n" \
@@ -16,3 +19,11 @@ jobs:
         env:
           SUPABASE_URL: https://depgkucsgxsjgsdesuzc.supabase.co
           SUPABASE_KEY: sb_publishable_3PJvPHoGmdtW6sjWc7MObw_ccm2ibky
+      - name: Heartbeat commit (保持仓库活跃，防止定时任务被 GitHub 自动禁用)
+        run: |
+          git config user.name "keepalive-bot"
+          git config user.email "bot@users.noreply.github.com"
+          echo "$(date -u)" > .keepalive
+          git add .keepalive
+          git commit -m "chore: keepalive heartbeat" || echo "nothing to commit"
+          git push
