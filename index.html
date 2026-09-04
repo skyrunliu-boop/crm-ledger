@@ -1476,35 +1476,42 @@ function doImport(file){
   reader.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      if(!rows.length){ toast('表格里没有数据'); return; }
-      const headers=Object.keys(rows[0]); const map={};
-      Object.entries(COLMAP).forEach(([k,keys])=>{ map[k]=pickCol(headers,keys); });
-      if(!map.code||!map.name){ toast('未能识别「编号」「名称」列'); return; }
-      const items=rows.map(r=>{
-        const t=guessType(r,map);
-        const cab = t==='gas' ? (guessCabinet(r[map.cabinet]) || (map.position?guessCabinet(r[map.position]):'') || 'combustible') : '';
-        return normItem({
-          id:uid(), sort:0, type:t,
-          code:String(r[map.code]??'').trim(), name:String(r[map.name]??'').trim(),
-          gbwno: map.gbwno?String(r[map.gbwno]??'').trim():'',
-          batch: map.batch?String(r[map.batch]??'').trim():'',
-          spec: map.spec?String(r[map.spec]??'').trim():'',
-          value: map.value?String(r[map.value]??'').trim():'',
-          uncert: map.uncert?String(r[map.uncert]??'').trim():'',
-          expiry: map.expiry?normDate(r[map.expiry]):'',
-          location: map.location?String(r[map.location]??'').trim():'',
-          cabinet: cab,
-          position: t==='gas' && map.position ? String(r[map.position]??'').trim().toUpperCase() : '',
-          amount: map.amount?(Number(String(r[map.amount]).replace('%',''))||100):100,
-          qty: map.qty?(Number(r[map.qty])||1):1,
-          need_return: map.needReturn ? ['是','true','1','y','yes','需要'].includes(String(r[map.needReturn]).trim().toLowerCase()) : false,
-          note: map.note?String(r[map.note]??'').trim():'',
+      // 遍历全部 sheet：按名称直接定类型（避免无「类型」列时气体/设备被误判为物质），空占位表自动跳过
+      const SHEET_TYPE={'标准物质':'material','标准气体':'gas','标准设备':'equipment'};
+      const items=[];
+      for(const sh of wb.SheetNames){
+        const ws=wb.Sheets[sh];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!rows.length) continue;
+        const headers=Object.keys(rows[0]); const map={};
+        Object.entries(COLMAP).forEach(([k,keys])=>{ map[k]=pickCol(headers,keys); });
+        if(!map.code||!map.name) continue;   // 该表无编号/名称列（如空占位表），跳过
+        const knownType=SHEET_TYPE[String(sh).trim()];
+        rows.forEach(r=>{
+          const t=knownType||guessType(r,map);
+          const cab = t==='gas' ? (guessCabinet(r[map.cabinet]) || (map.position?guessCabinet(r[map.position]):'') || 'combustible') : '';
+          const it=normItem({
+            id:uid(), sort:0, type:t,
+            code:String(r[map.code]??'').trim(), name:String(r[map.name]??'').trim(),
+            gbwno: map.gbwno?String(r[map.gbwno]??'').trim():'',
+            batch: map.batch?String(r[map.batch]??'').trim():'',
+            spec: map.spec?String(r[map.spec]??'').trim():'',
+            value: map.value?String(r[map.value]??'').trim():'',
+            uncert: map.uncert?String(r[map.uncert]??'').trim():'',
+            expiry: map.expiry?normDate(r[map.expiry]):'',
+            location: map.location?String(r[map.location]??'').trim():'',
+            cabinet: cab,
+            position: t==='gas' && map.position ? String(r[map.position]??'').trim().toUpperCase() : '',
+            amount: map.amount?(Number(String(r[map.amount]).replace('%',''))||100):100,
+            qty: map.qty?(Number(r[map.qty])||1):1,
+            need_return: map.needReturn ? ['是','true','1','y','yes','需要'].includes(String(r[map.needReturn]).trim().toLowerCase()) : false,
+            note: map.note?String(r[map.note]??'').trim():'',
+          });
+          if(it.code&&it.name) items.push(it);
         });
-      }).filter(x=>x.code&&x.name);
-      if(!items.length){ toast('没有有效行（编号或名称为空）'); return; }
-      if(!confirm(`识别到 ${items.length} 条，导入将【覆盖】现有台账，继续？`)) return;
+      }
+      if(!items.length){ toast('没有有效行（未识别到编号+名称）'); return; }
+      if(!confirm(`识别到 ${items.length} 条（含物质/气体/设备），导入将【覆盖】现有台账，继续？`)) return;
       const old=state.items.map(i=>i.id);
       state.items=items;
       if(state.mode==='local') localSave();
