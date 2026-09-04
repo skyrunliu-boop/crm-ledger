@@ -513,11 +513,31 @@ let toastTimer;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
 function fmt(dt){ if(!dt) return ''; const d=new Date(dt); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
-function daysTo(s){ if(!s) return null; const d=new Date(s+'T00:00:00'); if(isNaN(d)) return null; const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/86400000); }
+/* HTML 转义：批量拼字符串写 innerHTML 时必备，否则名称里的 < & " 会破坏页面结构 */
+const _ESC={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>_ESC[c]); }
+let _todayKey='', _todayMs=0;
+function todayMs(){ const k=new Date().toDateString(); if(k!==_todayKey){ const t=new Date(); t.setHours(0,0,0,0); _todayMs=t.getTime(); _todayKey=k; } return _todayMs; }
+function daysTo(s){ if(!s) return null; const d=Date.parse(s+'T00:00:00'); if(isNaN(d)) return null; return Math.round((d-todayMs())/86400000); }
 function expiryState(it){ const n=daysTo(it.expiry); if(n===null) return {level:'none',text:''};
   if(n<0) return {level:'expired',text:`已过期 ${-n} 天`}; if(n<=SOON_DAYS) return {level:'soon',text:`剩 ${n} 天`}; return {level:'ok',text:`剩 ${n} 天`}; }
 function needReturn(it){ return it.type==='gas' || it.type==='equipment' ? true : !!it.need_return; }
-function isBorrowed(id){ return state.loans.some(l=>l.item_id===id && l.kind==='borrow' && !l.return_at); }
+/* 建索引：每次渲染前重建一次，把 O(n) 的反复查找降为 O(1) */
+let _borrowSet=null, _itemIndex=null;
+function reindexBorrow(){
+  const s=new Set();
+  for(const l of state.loans){ if(l.kind==='borrow' && !l.return_at && l.item_id) s.add(l.item_id); }
+  _borrowSet=s;
+  const m=new Map();
+  for(const it of state.items) m.set(it.id,it);
+  _itemIndex=m;
+}
+function isBorrowed(id){ if(!_borrowSet) reindexBorrow(); return _borrowSet.has(id); }
+function findItem(id){
+  if(!_itemIndex) reindexBorrow();
+  const it=_itemIndex.get(id);
+  return it || state.items.find(i=>i.id===id) || null;   // 回退扫描，保证刚新增未重建索引时也能查到
+}
 function stockOut(it){ return it.type==='material' && !it.need_return && Number(it.qty||0)<=0; }
 function itemStatus(it){
   const es = expiryState(it);
@@ -532,7 +552,6 @@ function canTake(it){
   if (it.type==='material') return !it.need_return ? Number(it.qty||0)>0 : !isBorrowed(it.id);
   return !isBorrowed(it.id);
 }
-function findItem(id){ return state.items.find(i=>i.id===id); }
 function byType(t){ return state.items.filter(i=>i.type===t).sort((a,b)=>(a.sort||0)-(b.sort||0)||String(a.code).localeCompare(String(b.code))); }
 function posLabel(it){ if(it.type==='gas'){ const c=CABINETS[it.cabinet]; return (c?c.name:'—')+' '+it.position; } return it.location || '—'; }
 function gradient(p){ const v=Math.max(0,Math.min(100,Number(p)||0)); return `hsl(${v*1.2}, 70%, 60%)`; }
@@ -656,7 +675,25 @@ function renderConn(){
     : state.conn==='error' ? ('连接失败：'+state.errMsg) : '连接中…';
   txt.title = state.errMsg||'';
 }
-function renderAll(){ renderCounts(); renderPanel(); renderPane(); renderUnreturn(); renderExpiry(); renderHistory(); renderAlert(); renderWarnTicker(); renderConn(); }
+/* 渲染合并：短时间内触发的多次全量渲染合并成一次。
+   云端实时同步下，批量导入/批量操作会瞬间涌入上百个变更事件，
+   若每个事件都全量重绘，页面会被彻底卡死。 */
+let _rScheduled=false, _rLast=0;
+const RENDER_MIN_GAP=100;   // 两次全量渲染的最小间隔(ms)
+function renderAll(){
+  if(_rScheduled) return;
+  _rScheduled=true;
+  const gap = RENDER_MIN_GAP - (performance.now()-_rLast);
+  // 渲染已改为异步调度，此处必须兜底：否则渲染中的异常会变成无人接管的未捕获错误
+  const run = ()=>{ _rScheduled=false; _rLast=performance.now();
+    try{ doRenderAll(); }catch(err){ console.error('渲染失败：', err); }
+  };
+  if(gap<=0) requestAnimationFrame(run); else setTimeout(()=>requestAnimationFrame(run), gap);
+}
+function doRenderAll(){
+  reindexBorrow();
+  renderCounts(); renderPanel(); renderPane(); renderUnreturn(); renderExpiry(); renderHistory(); renderAlert(); renderWarnTicker(); renderConn();
+}
 function renderCounts(){
   ['material','gas','equipment'].forEach(t=>{ const el=$('#cnt-'+t); if(el) el.textContent = state.items.filter(i=>i.type===t).length; });
 }
@@ -1136,42 +1173,55 @@ function gasGridCard(){
 }
 
 /* 待归还 / 预警 / 历史 */
+/* 大表改用「拼字符串 + 一次性 innerHTML」：比逐格 createElement 快数倍。
+   行内按钮通过 data-* 属性委托绑定，仅绑定一次。 */
 function renderUnreturn(){
-  const tb=$('#unreturnTbody'); tb.innerHTML='';
+  const tb=$('#unreturnTbody'); if(!tb) return;
   const list=state.loans.filter(l=>l.kind==='borrow'&&!l.return_at).sort((a,b)=>new Date(a.borrow_at)-new Date(b.borrow_at));
   if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty-tip">当前没有待归还项 🎉</td></tr>'; return; }
-  list.forEach(l=>{
-    const it=findItem(l.item_id), tr=document.createElement('tr'); tr.className='row-unreturn';
-    const t0=document.createElement('td'); const bt=document.createElement('span');
-    bt.className='badge b-type'; bt.textContent=TYPES[l.item_type]||l.item_type; t0.appendChild(bt); tr.appendChild(t0);
-    [l.code,l.name].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const t3=document.createElement('td'); t3.textContent = it ? posLabel(it) : '—'; tr.appendChild(t3);
-    [l.borrower,l.remark].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const t6=document.createElement('td'); t6.className='mono'; t6.textContent=fmt(l.borrow_at); tr.appendChild(t6);
-    const t7=document.createElement('td'); const b=document.createElement('button');
-    b.className='btn-sm btn-green'; b.textContent='📥 归还'; b.onclick=()=>openReturn(l); t7.appendChild(b); tr.appendChild(t7);
-    tb.appendChild(tr);
+  const rows=list.map(l=>{
+    const it=findItem(l.item_id);
+    return '<tr class="row-unreturn">'
+      + `<td><span class="badge b-type">${esc(TYPES[l.item_type]||l.item_type)}</span></td>`
+      + `<td>${esc(l.code)||'—'}</td>`
+      + `<td>${esc(l.name)||'—'}</td>`
+      + `<td>${esc(it?posLabel(it):'')||'—'}</td>`
+      + `<td>${esc(l.borrower)||'—'}</td>`
+      + `<td>${esc(l.remark)||'—'}</td>`
+      + `<td class="mono">${esc(fmt(l.borrow_at))}</td>`
+      + `<td><button class="btn-sm btn-green" data-return="${esc(l.id)}">📥 归还</button></td>`
+      + '</tr>';
+  });
+  tb.innerHTML=rows.join('');
+  tb.querySelectorAll('[data-return]').forEach(b=>{
+    b.onclick=()=>{ const l=state.loans.find(x=>x.id===b.dataset.return); if(l) openReturn(l); };
   });
 }
 function renderExpiry(){
+  const box=$('#expiryBox'); if(box && box.style.display==='none') return;   // 折叠时不渲染，展开时再补
   const tb=$('#expiryTbody'); tb.innerHTML='';
   const list=state.items.map(i=>({i,es:expiryState(i)})).filter(x=>x.es.level==='expired'||x.es.level==='soon')
     .sort((a,b)=>(daysTo(a.i.expiry)??9999)-(daysTo(b.i.expiry)??9999));
   if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty-tip">没有过期或临期项 ✅</td></tr>'; return; }
-  list.forEach(({i,es})=>{
-    const tr=document.createElement('tr'); tr.className = es.level==='expired'?'row-expired':'row-soon';
-    const t0=document.createElement('td'); const b=document.createElement('span');
-    b.className='badge '+(es.level==='expired'?'b-expired':'b-soon'); b.textContent=es.level==='expired'?'已过期':'临期'; t0.appendChild(b); tr.appendChild(t0);
-    const t1=document.createElement('td'); t1.textContent=TYPES[i.type]||i.type; tr.appendChild(t1);
-    [i.code,i.name].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const t4=document.createElement('td'); t4.className='mono'; t4.textContent=i.expiry||'—'; tr.appendChild(t4);
-    const t5=document.createElement('td'); t5.textContent=es.text; tr.appendChild(t5);
-    const t6=document.createElement('td'); t6.textContent=posLabel(i); tr.appendChild(t6);
-    const t7=document.createElement('td'); t7.textContent=itemStatus(i).txt; tr.appendChild(t7);
-    tb.appendChild(tr);
+  const rows=list.map(({i,es})=>{
+    const bad = es.level==='expired'
+      ? '<span class="badge b-expired">已过期</span>'
+      : '<span class="badge b-soon">临期</span>';
+    return `<tr class="${es.level==='expired'?'row-expired':'row-soon'}">`
+      + `<td>${bad}</td>`
+      + `<td>${esc(TYPES[i.type]||i.type)}</td>`
+      + `<td>${esc(i.code)||'—'}</td>`
+      + `<td>${esc(i.name)||'—'}</td>`
+      + `<td class="mono">${esc(i.expiry)||'—'}</td>`
+      + `<td>${esc(es.text)}</td>`
+      + `<td>${esc(posLabel(i))}</td>`
+      + `<td>${esc(itemStatus(i).txt)}</td>`
+      + '</tr>';
   });
+  tb.innerHTML=rows.join('');
 }
 function renderHistory(){
+  const box=$('#historyBox'); if(box && box.style.display==='none') return;   // 折叠时不渲染，展开时再补
   const tb=$('#historyTbody'); tb.innerHTML='';
   const q=($('#histSearch').value||'').trim().toLowerCase(), tf=$('#histType').value;
   const list=state.loans
@@ -1179,23 +1229,27 @@ function renderHistory(){
     .filter(l=>!q||[l.code,l.name,l.borrower].join(' ').toLowerCase().includes(q))
     .sort((a,b)=>new Date(b.borrow_at)-new Date(a.borrow_at));
   if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty-tip">暂无记录</td></tr>'; return; }
-  list.forEach(l=>{
-    const tr=document.createElement('tr');
-    const t0=document.createElement('td'); const bt=document.createElement('span');
-    bt.className='badge b-type'; bt.textContent=TYPES[l.item_type]||l.item_type; t0.appendChild(bt); tr.appendChild(t0);
-    [l.code,l.name,l.borrower].forEach(v=>{ const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td); });
-    const t4=document.createElement('td'); t4.className='mono'; t4.textContent=fmt(l.borrow_at); tr.appendChild(t4);
-    const t5=document.createElement('td'); t5.className='mono';
-    if(l.kind==='consume'){ const s=document.createElement('span'); s.className='badge b-ok'; s.textContent='消耗·无需归还'; t5.appendChild(s); }
-    else if(l.return_at) t5.textContent=fmt(l.return_at);
-    else { const s=document.createElement('span'); s.className='badge b-borrowed'; s.textContent='未归还'; t5.appendChild(s); }
-    tr.appendChild(t5);
-    const t6=document.createElement('td');
-    t6.textContent = l.kind==='consume' ? ('×'+l.qty) : (l.remain===null||l.remain===undefined ? '—' : l.remain+'%');
-    tr.appendChild(t6);
-    const t7=document.createElement('td'); t7.textContent=(l.remark||'—')+(l.return_note?('；归还：'+l.return_note):''); tr.appendChild(t7);
-    tb.appendChild(tr);
+  const rows=list.map(l=>{
+    let r5;
+    if(l.kind==='consume') r5='<span class="badge b-ok">消耗·无需归还</span>';
+    else if(l.return_at) r5=esc(fmt(l.return_at));
+    else r5='<span class="badge b-borrowed">未归还</span>';
+    const r6 = l.kind==='consume'
+      ? ('×'+Number(l.qty||1))
+      : (l.remain===null||l.remain===undefined ? '—' : esc(l.remain)+'%');
+    const r7 = (l.remark||'—') + (l.return_note?('；归还：'+l.return_note):'');
+    return '<tr>'
+      + `<td><span class="badge b-type">${esc(TYPES[l.item_type]||l.item_type)}</span></td>`
+      + `<td>${esc(l.code)||'—'}</td>`
+      + `<td>${esc(l.name)||'—'}</td>`
+      + `<td>${esc(l.borrower)||'—'}</td>`
+      + `<td class="mono">${esc(fmt(l.borrow_at))}</td>`
+      + `<td class="mono">${r5}</td>`
+      + `<td>${r6}</td>`
+      + `<td>${esc(r7)}</td>`
+      + '</tr>';
   });
+  tb.innerHTML=rows.join('');
 }
 
 /* ================= 领用 / 归还 ================= */
@@ -1562,9 +1616,9 @@ function bind(){
   $('#cancelReturnBtn').onclick=()=>$('#returnDlg').close();
 
   $('#toggleExpiryBtn').onclick=e=>{ const b=$('#expiryBox'), o=b.style.display!=='none';
-    b.style.display=o?'none':'block'; e.target.textContent=o?'▶':'▼'; };
+    b.style.display=o?'none':'block'; e.target.textContent=o?'▶':'▼'; if(!o) renderExpiry(); };
   $('#toggleHistoryBtn').onclick=e=>{ const b=$('#historyBox'), o=b.style.display!=='none';
-    b.style.display=o?'none':'block'; e.target.textContent=o?'▶':'▼'; };
+    b.style.display=o?'none':'block'; e.target.textContent=o?'▶':'▼'; if(!o) renderHistory(); };
   $('#histSearch').oninput=renderHistory;
   $('#histType').onchange=renderHistory;
 
@@ -1598,7 +1652,9 @@ function boot(){
   state.mode = (state.cfg.url&&state.cfg.key) ? 'cloud' : 'local';
   if(state.mode==='local'){ localLoad(); renderAll(); }
   connectCloud();
-  setInterval(()=>{ renderUnreturn(); renderAlert(); }, 10000);
+  // 定时只刷新「随时间会变」的轻量内容（到期状态、预警跑马灯）。
+  // 待归还清单只随借/还变化，而借还必然触发 renderAll，无需在此重绘（省掉一次全表 DOM 重建）。
+  setInterval(()=>{ renderAlert(); renderWarnTicker(); }, 30000);
 }
 boot();
 </script>
