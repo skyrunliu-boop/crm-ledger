@@ -177,6 +177,8 @@
       .tab .cnt{ font-size:.66rem; }
       .card{ border-radius:18px; padding:14px; margin-bottom:16px; }
       .card-title{ font-size:1.02rem; gap:8px; margin-bottom:12px; }
+      .mine-toggle{ margin-left:6px; font-weight:400; font-size:.8rem; cursor:pointer; user-select:none; color:#475569; white-space:nowrap; }
+      .mine-toggle input{ vertical-align:-1px; margin-right:3px; }
       .title-actions{ gap:6px; }
       .title-actions .btn-sm{ font-size:.7rem; padding:7px 10px; }
       .form-row{ flex-direction:column; gap:10px; align-items:stretch; }
@@ -270,6 +272,7 @@
 
         <div class="card">
             <div class="card-title">⏳ 待归还清单 <span id="unreturnBadge" class="badge b-borrowed">0</span>
+                <label class="mine-toggle"><input type="checkbox" id="mineOnlyChk" checked> 仅看我的</label>
                 <span class="hint" style="font-weight:400;">气体与设备必须归还 · 标记为「需归还」的物质也在此</span></div>
             <div style="overflow-x:auto;">
                 <table>
@@ -438,6 +441,17 @@ const LOW_QTY = 3;        // 标准物质库存预警阈值：qty ≤ 即预警
 const LOW_AMOUNT = 15;    // 标准气体余量预警阈值(%)：amount ≤ 即预警
 const ALLOWED_EDITOR = '妙蛙种子';   // 仅此用户可新增/修改/删除台账（领用/归还不受限）
 function canEdit(){ return !!(state.me && state.me.name === ALLOWED_EDITOR); }
+// 视图范围：妙蛙种子（管理员）默认看全部；普通用户默认仅看自己领用未归还
+function myName(){ return (state.me && state.me.name) || ''; }
+function scopeMine(){
+  if(canEdit()) return false;                       // 管理员看全部
+  const c=$('#mineOnlyChk'); return c ? c.checked : true;
+}
+function applyScopeDefault(){
+  const c=$('#mineOnlyChk'); if(!c) return;
+  if(canEdit()){ c.checked=false; c.parentElement.style.display='none'; }
+  else { c.checked=true; }
+}
 
 /* 预警口径（三类互斥，别混）：
    - 标准物质：看「库存数量」；勾了「需归还」的走借用流程，不看库存
@@ -713,7 +727,8 @@ function renderCounts(){
   ['material','gas','equipment'].forEach(t=>{ const el=$('#cnt-'+t); if(el) el.textContent = state.items.filter(i=>i.type===t).length; });
 }
 function renderAlert(){
-  const un = state.loans.filter(l=>l.kind==='borrow' && !l.return_at).length;
+  const me=myName(), mine=scopeMine();
+  const un = state.loans.filter(l=>l.kind==='borrow' && !l.return_at && (!mine||l.borrower===me)).length;
   $('#unreturnNum').textContent = un; $('#unreturnBadge').textContent = un;
   $('#blinkWrap').innerHTML = un>0 ? '<span class="blink">项待归还</span>' : '<span>全部已归还</span>';
   const ex = state.items.filter(i=>expiryState(i).level==='expired').length;
@@ -1192,8 +1207,10 @@ function gasGridCard(){
    行内按钮通过 data-* 属性委托绑定，仅绑定一次。 */
 function renderUnreturn(){
   const tb=$('#unreturnTbody'); if(!tb) return;
-  const list=state.loans.filter(l=>l.kind==='borrow'&&!l.return_at).sort((a,b)=>new Date(a.borrow_at)-new Date(b.borrow_at));
-  if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty-tip">当前没有待归还项 🎉</td></tr>'; return; }
+  const me=myName(), mine=scopeMine();
+  const list=state.loans.filter(l=>l.kind==='borrow'&&!l.return_at && (!mine||l.borrower===me))
+    .sort((a,b)=>new Date(a.borrow_at)-new Date(b.borrow_at));
+  if(!list.length){ tb.innerHTML=`<tr><td colspan="8" class="empty-tip">${mine?'你当前没有待归还项 🎉':'当前没有待归还项 🎉'}</td></tr>`; return; }
   const rows=list.map(l=>{
     const it=findItem(l.item_id);
     return '<tr class="row-unreturn">'
@@ -1239,8 +1256,10 @@ function renderHistory(){
   const box=$('#historyBox'); if(box && box.style.display==='none') return;   // 折叠时不渲染，展开时再补
   const tb=$('#historyTbody'); tb.innerHTML='';
   const q=($('#histSearch').value||'').trim().toLowerCase(), tf=$('#histType').value;
+  const me=myName(), mine=scopeMine();
   const list=state.loans
     .filter(l=>!tf||l.item_type===tf)
+    .filter(l=>!mine||l.borrower===me)
     .filter(l=>!q||[l.code,l.name,l.borrower].join(' ').toLowerCase().includes(q))
     .sort((a,b)=>new Date(b.borrow_at)-new Date(a.borrow_at));
   if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty-tip">暂无记录</td></tr>'; return; }
@@ -1643,9 +1662,10 @@ function bind(){
     b.style.display=o?'none':'block'; e.target.textContent=o?'▶':'▼'; if(!o) renderHistory(); };
   $('#histSearch').oninput=renderHistory;
   $('#histType').onchange=renderHistory;
+  $('#mineOnlyChk').onchange=()=>{ renderUnreturn(); renderHistory(); };
 
   $('#nameBtn').onclick=()=>{ const v=(prompt('你的名字（用于默认领用人）',(state.me&&state.me.name)||'')||'').trim();
-    if(v){ state.me.name=v.slice(0,12); try{ localStorage.setItem(LS_ME,JSON.stringify(state.me)); }catch(e){} toast('已更新'); } };
+    if(v){ state.me.name=v.slice(0,12); try{ localStorage.setItem(LS_ME,JSON.stringify(state.me)); }catch(e){} applyScopeDefault(); renderAll(); toast('已更新'); } };
   $('#shareBtn').onclick=async()=>{
     if(!state.cfg.url||!state.cfg.key){ toast('请先配置云同步'); $('#cfgUrl').value=state.cfg.url||''; $('#cfgKey').value=state.cfg.key||''; $('#syncDlg').showModal(); return; }
     const url=new URL(location.href); url.hash=new URLSearchParams({u:state.cfg.url,k:state.cfg.key}).toString();
@@ -1669,7 +1689,7 @@ function bind(){
 
 /* ================= 启动 ================= */
 function boot(){
-  loadCfg(); ensureName(); state.ui=loadUI(); bind();
+  loadCfg(); ensureName(); state.ui=loadUI(); bind(); applyScopeDefault();
   try{ state.tab = localStorage.getItem(LS_TAB) || 'material'; }catch(e){ state.tab='material'; }
   state.mode = (state.cfg.url&&state.cfg.key) ? 'cloud' : 'local';
   if(state.mode==='local'){ localLoad(); renderAll(); }
