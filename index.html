@@ -439,6 +439,21 @@ const LOW_AMOUNT = 15;    // 标准气体余量预警阈值(%)：amount ≤ 即�
 const ALLOWED_EDITOR = '妙蛙种子';   // 仅此用户可新增/修改/删除台账（领用/归还不受限）
 function canEdit(){ return !!(state.me && state.me.name === ALLOWED_EDITOR); }
 
+/* 预警口径（三类互斥，别混）：
+   - 标准物质：看「库存数量」；勾了「需归还」的走借用流程，不看库存
+   - 标准气体：只看「余量百分比」，不看库存数量
+   - 标准设备：既不看库存也不看余量，只看有效期
+   判定集中在这两个函数里，避免各处散落条件导致口径漂移。 */
+function isLowStock(it){                       // 仅：消耗型标准物质
+  if(it.type!=='material' || it.need_return) return false;
+  const q=Number(it.qty||0);
+  return q>0 && q<=LOW_QTY;
+}
+function isLowAmount(it){                      // 仅：标准气体
+  if(it.type!=='gas') return false;
+  return Number(it.amount||0)<=LOW_AMOUNT;
+}
+
 const TYPES = { material:'标准物质', gas:'标准气体', equipment:'标准设备' };
 const CABINETS = {
   combustible: { name:'🔥 可燃柜', prefix:'可燃', cols:11, rows:9, colStart:'A' },
@@ -560,8 +575,8 @@ function warnParts(it){
   const es=expiryState(it);
   if(es.level==='expired') w.push(`已过期 ${-daysTo(it.expiry)} 天`);
   else if(es.level==='soon') w.push(`有效期剩 ${daysTo(it.expiry)} 天`);
-  if(it.type==='material' && !it.need_return){ const q=Number(it.qty||0); if(q>0 && q<=LOW_QTY) w.push(`库存仅 ${q}`); }
-  if(it.type==='gas'){ const a=Number(it.amount||0); if(a<=LOW_AMOUNT) w.push(`余量 ${a}%`); }
+  if(isLowStock(it)) w.push(`库存仅 ${Number(it.qty||0)}`);
+  if(isLowAmount(it)) w.push(`余量 ${Number(it.amount||0)}%`);
   return w;
 }
 function hasWarn(it){ return warnParts(it).length>0; }
@@ -703,8 +718,8 @@ function renderAlert(){
   $('#blinkWrap').innerHTML = un>0 ? '<span class="blink">项待归还</span>' : '<span>全部已归还</span>';
   const ex = state.items.filter(i=>expiryState(i).level==='expired').length;
   const so = state.items.filter(i=>expiryState(i).level==='soon').length;
-  const lo = state.items.filter(i=>i.type==='material' && !i.need_return && Number(i.qty||0)>0 && Number(i.qty||0)<=LOW_QTY).length;
-  const ga = state.items.filter(i=>i.type==='gas' && Number(i.amount||0)<=LOW_AMOUNT).length;
+  const lo = state.items.filter(isLowStock).length;
+  const ga = state.items.filter(isLowAmount).length;
   $('#expiryTxt').innerHTML = `已过期 <b style="color:#b91c1c">${ex}</b> · 30天内 <b style="color:#b45309">${so}</b> · 库存≤${LOW_QTY} <b style="color:#b45309">${lo}</b> · 余量≤${LOW_AMOUNT}% <b style="color:#b45309">${ga}</b>`;
 }
 function renderWarnTicker(){
@@ -817,16 +832,16 @@ function statsOf(list){
     if(st.txt==='在库') s.avail++;
     else if(st.txt==='借出中') s.borrowed++;
     else if(st.txt==='库存耗尽') s.out++;
-    if(i.type==='material' && !i.need_return && Number(i.qty||0)>0 && Number(i.qty||0)<=LOW_QTY) s.low++;
-    else if(i.type==='gas' && Number(i.amount||0)<=LOW_AMOUNT) s.lowGas++;
+    if(isLowStock(i)) s.low++;
+    if(isLowAmount(i)) s.lowGas++;
   });
   return s;
 }
 function statLine(type){
   const s=statsOf(byType(type));
   const p=[`共 ${s.total} 项`,`在库 ${s.avail}`,`借出 ${s.borrowed}`];
-  if(type==='material') p.push(`库存≤3 ${s.low}`,`耗尽 ${s.out}`);
-  if(type==='gas') p.push(`余量≤15% ${s.lowGas}`);
+  if(type==='material') p.push(`库存≤${LOW_QTY} ${s.low}`,`耗尽 ${s.out}`);
+  if(type==='gas') p.push(`余量≤${LOW_AMOUNT}% ${s.lowGas}`);
   p.push(`有效期≤30 ${s.soon}`,`已过期 ${s.expired}`);
   return p.join('　·　');
 }
@@ -838,8 +853,8 @@ const COLS={
   equipment:[{k:'code',l:'编号'},{k:'name',l:'名称'},{k:'uncert',l:'型号'},{k:'batch',l:'资产号'},{k:'value',l:'参数'},{k:'expiry',l:'校准有效期'},{k:'location',l:'位置'},{k:'_st',l:'状态'},{k:'_op',l:'操作'}],
 };
 const FILTERS={
-  material:[['all','全部'],['available','在库'],['borrowed','借出中'],['needreturn','需归还'],['low','库存≤3'],['out','耗尽'],['soon','有效期≤30'],['expired','已过期']],
-  gas:[['all','全部'],['available','在库'],['borrowed','借出中'],['low','余量≤15%'],['soon','有效期≤30'],['expired','已过期']],
+  material:[['all','全部'],['available','在库'],['borrowed','借出中'],['needreturn','需归还'],[`low`,`库存≤${LOW_QTY}`],['out','耗尽'],['soon','有效期≤30'],['expired','已过期']],
+  gas:[['all','全部'],['available','在库'],['borrowed','借出中'],['low',`余量≤${LOW_AMOUNT}%`],['soon','有效期≤30'],['expired','已过期']],
   equipment:[['all','全部'],['available','在库'],['borrowed','借出中'],['soon','有效期≤30'],['expired','已过期']],
 };
 function matchFilter(it, f){
@@ -850,7 +865,7 @@ function matchFilter(it, f){
   if(f==='soon') return es.level==='soon';
   if(f==='expired') return es.level==='expired';
   if(f==='needreturn') return !!it.need_return;
-  if(f==='low'){ if(it.type==='material') return !it.need_return && Number(it.qty||0)>0 && Number(it.qty||0)<=LOW_QTY; if(it.type==='gas') return Number(it.amount||0)<=LOW_AMOUNT; return false; }
+  if(f==='low') return isLowStock(it) || isLowAmount(it);   // 物质看库存、气体看余量
   return true;
 }
 function sortVal(it,k){
@@ -984,7 +999,7 @@ function ledgerRow(type, it){
     }
     else if(col.k==='qty'){
       if(it.need_return){ const s=document.createElement('span'); s.className='badge b-return'; s.textContent='需归还'; td.appendChild(s); }
-      else { const s=document.createElement('span'); s.className='qty '+(Number(it.qty)<=0?'zero':Number(it.qty)<=LOW_QTY?'low':''); s.textContent=it.qty; td.appendChild(s); }
+      else { const s=document.createElement('span'); s.className='qty '+(Number(it.qty)<=0?'zero':isLowStock(it)?'low':''); s.textContent=it.qty; td.appendChild(s); }
     }
     else if(col.k==='need_return'){
       const s=document.createElement('span'); s.className='badge '+(it.need_return?'b-return':'b-ok'); s.textContent=it.need_return?'需归还':'消耗'; td.appendChild(s);
@@ -992,7 +1007,7 @@ function ledgerRow(type, it){
     else if(col.k==='amount'){
       const s=document.createElement('span');
       const a=Number(it.amount||0);
-      const warn = a<=LOW_AMOUNT ? 'outline:2px solid #dc2626;outline-offset:-2px;' : '';
+      const warn = isLowAmount(it) ? 'outline:2px solid #dc2626;outline-offset:-2px;' : '';
       s.style.cssText=`display:inline-block;min-width:48px;padding:2px 9px;border-radius:20px;color:#0f172a;font-weight:700;background:${gradient(it.amount)};${warn}`;
       s.textContent=it.amount+'%'; td.appendChild(s);
     }
@@ -1154,7 +1169,7 @@ function gasGridCard(){
         if(!g){ td.className='gas-cell-empty'; td.textContent='·'; td.title=`${cfg.name} ${pos}（空位）`; tr.appendChild(td); return; }
         const borrowed=isBorrowed(g.id);
         const loan=borrowed?state.loans.find(l=>l.item_id===g.id&&l.kind==='borrow'&&!l.return_at):null;
-        if(borrowed) td.className='gas-cell-borrowed'; else { td.style.background=gradient(g.amount); if(Number(g.amount||0)<=LOW_AMOUNT) td.classList.add('gas-cell-warn'); }
+        if(borrowed) td.className='gas-cell-borrowed'; else { td.style.background=gradient(g.amount); if(isLowAmount(g)) td.classList.add('gas-cell-warn'); }
         const p=document.createElement('span'); p.className='gas-cell-text'; p.textContent=pos; td.appendChild(p);
         const n=document.createElement('span'); n.className='gas-cell-detail'; n.textContent=g.name||'-'; td.appendChild(n);
         if(g.value){ const v=document.createElement('span'); v.className='gas-cell-detail'; v.textContent=g.value; td.appendChild(v); }
