@@ -653,7 +653,7 @@ async function connectCloud(){
       await state.sb.from(T_ITEM).upsert(seed.map(rowOf));
       state.items = seed;
     }
-    renderAll(); subscribe(); state.conn='live';
+    renderAll(); subscribe(); state.conn='live'; flushPending();
   }catch(err){
     state.conn='error'; state.errMsg=(err&&err.message)||String(err); localLoad(); renderAll();
   }
@@ -673,27 +673,93 @@ function subscribe(){
   const ch = state.sb.channel('crm-sync');
   ch.on('postgres_changes',{event:'*',schema:'public',table:T_ITEM},p=>{
     if(p.eventType==='DELETE'){ const id=p.old&&p.old.id; state.items=state.items.filter(i=>i.id!==id); }
+    // 本地该行有待同步的修改时，忽略旧回显，避免刚改的内容被覆盖回去
+    else if(p.new && pendHas(T_ITEM,p.new.id)){ /* 本地版本为准，flushPending 稍后覆盖云端 */ }
     else { const it=normItem(p.new); const i=state.items.findIndex(x=>x.id===it.id); if(i>=0) state.items[i]=it; else state.items.push(it); }
     renderAll();
   });
   ch.on('postgres_changes',{event:'*',schema:'public',table:T_LOAN},p=>{
     if(p.eventType==='DELETE'){ const id=p.old&&p.old.id; state.loans=state.loans.filter(l=>l.id!==id); }
+    else if(p.new && pendHas(T_LOAN,p.new.id)){ /* 同上 */ }
     else { const l=normLoan(p.new); const i=state.loans.findIndex(x=>x.id===l.id); if(i>=0) state.loans[i]=l; else state.loans.unshift(l); }
     renderAll();
   });
   ch.subscribe(status=>{
-    if(status==='SUBSCRIBED'){ state.conn='live'; }
+    if(status==='SUBSCRIBED'){ state.conn='live'; flushPending(); }
     else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){ state.conn='error'; state.errMsg='实时频道异常（刷新可重连）'; }
     renderConn();
   });
   state.channel=ch;
 }
-async function push(it){ if(state.mode==='local'){ localSave(); return; } if(!state.sb) return;
-  const {error}=await state.sb.from(T_ITEM).upsert(rowOf(it)); if(error) toast('同步失败：'+error.message); }
-async function pushLoan(l){ if(state.mode==='local'){ localSave(); return; } if(!state.sb) return;
-  const {error}=await state.sb.from(T_LOAN).upsert(loanRowOf(l)); if(error) toast('同步失败：'+error.message); }
-async function dropRow(t,id){ if(state.mode==='local'){ localSave(); return; } if(!state.sb) return;
-  const {error}=await state.sb.from(t).delete().eq('id',id); if(error) toast('删除同步失败：'+error.message); }
+/* ---- 可靠同步：先落「待同步队列」，再发请求 ----
+   旧实现发完请求就提示已保存：弱网 / 切后台 / 保存后立刻关页都会掐断在途请求，
+   云端模式下内存数据不进 localStorage，一刷新编辑就丢了。
+   现在任何写操作先持久化到队列（localStorage），成功才出队；失败由 flushPending
+   在重连 / 每 30 秒自动补传，保证最终一定存上。 */
+const LS_PEND='wbCrm.pend.v1';
+let _pendSeq=Date.now(), _flushing=false;
+function pendLoad(){ try{ return JSON.parse(localStorage.getItem(LS_PEND)||'[]'); }catch(e){ return []; } }
+function pendSave(l){ try{ localStorage.setItem(LS_PEND,JSON.stringify(l)); }catch(e){} }
+/* 同一 (表,id) 只保留最新一条待同步操作；seq 用于「旧的在途请求成功后不得误删新排队操作」 */
+function pendAdd(op){ op.seq=++_pendSeq; const l=pendLoad().filter(o=>!(o.table===op.table&&o.id===op.id)); l.push(op); pendSave(l); return op.seq; }
+function pendDelIf(table,id,seq){ pendSave(pendLoad().filter(o=>!(o.table===table&&o.id===id&&o.seq<=seq))); }
+function pendHas(table,id){ return pendLoad().some(o=>o.table===table&&o.id===id); }
+async function push(it){
+  if(state.mode==='local'){ localSave(); return {error:null}; }
+  if(!state.sb) return {error:{message:'未连接云端'}};
+  const row=rowOf(it);
+  const seq=pendAdd({op:'upsert',table:T_ITEM,id:it.id,row});
+  let last=null;
+  for(let a=0;a<2;a++){
+    if(a) await new Promise(r=>setTimeout(r,800));
+    try{ const {error}=await state.sb.from(T_ITEM).upsert(row); if(!error){ pendDelIf(T_ITEM,it.id,seq); return {error:null}; } last=error; }
+    catch(e){ last=e; }
+  }
+  return {error:last};   // 已在待同步队列，联网后自动补传
+}
+async function pushLoan(l){
+  if(state.mode==='local'){ localSave(); return {error:null}; }
+  if(!state.sb) return {error:{message:'未连接云端'}};
+  const row=loanRowOf(l);
+  const seq=pendAdd({op:'upsert',table:T_LOAN,id:l.id,row});
+  let last=null;
+  for(let a=0;a<2;a++){
+    if(a) await new Promise(r=>setTimeout(r,800));
+    try{ const {error}=await state.sb.from(T_LOAN).upsert(row); if(!error){ pendDelIf(T_LOAN,l.id,seq); return {error:null}; } last=error; }
+    catch(e){ last=e; }
+  }
+  return {error:last};
+}
+async function dropRow(t,id){
+  if(state.mode==='local'){ localSave(); return {error:null}; }
+  if(!state.sb) return {error:{message:'未连接云端'}};
+  const seq=pendAdd({op:'delete',table:t,id});
+  try{ const {error}=await state.sb.from(t).delete().eq('id',id); if(!error){ pendDelIf(t,id,seq); return {error:null}; } return {error}; }
+  catch(e){ return {error:e}; }
+}
+/* 把队列里积压的操作批量补传云端（删除按 id 批量、写入按 200 条分块） */
+async function flushPending(){
+  if(_flushing || state.mode!=='cloud' || !state.sb) return;
+  const l=pendLoad(); if(!l.length) return;
+  _flushing=true;
+  const remain=[];
+  try{
+    const grp=t=>({ del:l.filter(o=>o.table===t&&o.op==='delete'), ups:l.filter(o=>o.table===t&&o.op==='upsert') });
+    const tryDel=async(t,ops)=>{ if(!ops.length) return;
+      try{ const r=await state.sb.from(t).delete().in('id',ops.map(o=>o.id)); if(!r.error) return; }catch(e){}
+      remain.push(...ops); };
+    const tryUps=async(t,ops)=>{ if(!ops.length) return; const CH=200;
+      for(let i=0;i<ops.length;i+=CH){
+        const ch=ops.slice(i,i+CH);
+        try{ const r=await state.sb.from(t).upsert(ch.map(o=>o.row)); if(r.error) remain.push(...ch); }
+        catch(e){ remain.push(...ch); }
+      } };
+    const gi=grp(T_ITEM), gl=grp(T_LOAN);
+    await Promise.all([tryDel(T_ITEM,gi.del),tryUps(T_ITEM,gi.ups),tryDel(T_LOAN,gl.del),tryUps(T_LOAN,gl.ups)]);
+  }catch(e){ remain.length=0; remain.push(...l); }
+  pendSave(remain); _flushing=false;
+  if(remain.length<l.length){ renderAll(); if(!remain.length) toast('待同步的修改已全部上传'); }
+}
 
 /* ================= 渲染 ================= */
 function renderConn(){
@@ -1351,8 +1417,12 @@ function confirmReturn(){
   l.return_at=new Date().toISOString(); l.remain=remain;
   l.return_note=($('#r_note').value||'').trim();
   pushLoan(l);
-  if(it && remain!==null){ it.amount=remain; push(it); }
-  if(it && l.item_type==='material' && it.need_return){ it.qty = Number(it.qty||0) + 1; push(it); }
+  // 同一行的多处变更合并为一次推送：旧实现连发两次 upsert，可能在服务器乱序落地，把库存+1 冲掉
+  if(it){
+    if(remain!==null) it.amount=remain;
+    if(l.item_type==='material' && it.need_return) it.qty = Number(it.qty||0) + 1;
+    push(it);
+  }
   $('#returnDlg').close(); renderAll();
   toast(`已归还：${l.code}${remain!==null?'，余量 '+remain+'%':''}`);
 }
@@ -1387,7 +1457,7 @@ function syncTypeFields(){
   const qg = document.querySelector('#rowMat .form-group:nth-child(2)');
   if(qg) qg.style.display = (t==='material') ? 'block' : 'none';
 }
-function saveItem(){
+async function saveItem(){
   if(!canEdit()){ toast('无权限执行此操作'); return; }
   const t=$('#f_type').value;
   const code=$('#f_code').value.trim(), name=$('#f_name').value.trim();
@@ -1417,9 +1487,22 @@ function saveItem(){
     if(dup){ toast('该柜位已被占用：'+dup.code); return; }
   }
   const id=$('#f_id').value;
-  if(id){ const it=findItem(id); if(it){ Object.assign(it,data); push(it); } }
-  else { const it=Object.assign({ id:uid(), sort:Date.now() }, data); state.items.push(it); push(it); }
-  $('#itemDlg').close(); renderAll(); toast('已保存');
+  const btn=$('#saveItemBtn');
+  btn.disabled=true; const oldTxt=btn.textContent; btn.textContent='保存中…';
+  let r={error:null};
+  try{
+    if(id){
+      const it=findItem(id);
+      if(!it){ toast('该项已被其他设备删除，请刷新'); return; }
+      Object.assign(it,data); r=await push(it);
+    }else{
+      const it=Object.assign({ id:uid(), sort:Date.now() }, data);
+      state.items.push(it); r=await push(it);
+    }
+  }finally{ btn.disabled=false; btn.textContent=oldTxt; }
+  $('#itemDlg').close(); renderAll();
+  // push 内部已先把写操作持久化到待同步队列，即使这里报错，联网后也会自动补传，不会丢
+  toast(r.error ? '已保存在本机，网络恢复后自动同步云端' : '已保存');
 }
 function deleteItem(){
   if(!canEdit()){ toast('无权限执行此操作'); return; }
@@ -1534,8 +1617,9 @@ function doImport(file){
       const old=state.items.map(i=>i.id);
       state.items=items;
       if(state.mode==='local') localSave();
-      else { old.forEach(id=>state.sb.from(T_ITEM).delete().eq('id',id));
-        state.sb.from(T_ITEM).upsert(items.map(rowOf)).then(r=>{ if(r.error) toast('导入同步失败：'+r.error.message); }); }
+      else { old.forEach(id=>pendAdd({op:'delete',table:T_ITEM,id}));
+        items.forEach(it=>pendAdd({op:'upsert',table:T_ITEM,id:it.id,row:rowOf(it)}));
+        flushPending(); }
       renderAll(); toast(`导入成功 ${items.length} 条`);
     }catch(err){ toast('导入失败：'+err.message); }
   };
@@ -1597,14 +1681,14 @@ async function applyRestore(data){
     const newLoans=(data.loans||[]).map(normLoan);
     if(state.mode==='cloud' && state.sb){
       const [ci,cl]=await Promise.all([state.sb.from(T_ITEM).select('id'), state.sb.from(T_LOAN).select('id')]);
-      const delI=(ci.data||[]).map(r=>r.id), delL=(cl.data||[]).map(r=>r.id);
-      if(delI.length){ const r=await state.sb.from(T_ITEM).delete().in('id',delI); if(r.error) throw r.error; }
-      if(delL.length){ const r=await state.sb.from(T_LOAN).delete().in('id',delL); if(r.error) throw r.error; }
-      const CH=200;
-      for(let i=0;i<newItems.length;i+=CH){ const r=await state.sb.from(T_ITEM).upsert(newItems.slice(i,i+CH).map(rowOf)); if(r.error) throw r.error; }
-      for(let i=0;i<newLoans.length;i+=CH){ const r=await state.sb.from(T_LOAN).upsert(newLoans.slice(i,i+CH).map(loanRowOf)); if(r.error) throw r.error; }
+      // 全部走待同步队列：即使中途断网，重连后 flushPending 会自动补完，不会出现删了没建回的中间态
+      (ci.data||[]).forEach(r=>pendAdd({op:'delete',table:T_ITEM,id:r.id}));
+      (cl.data||[]).forEach(r=>pendAdd({op:'delete',table:T_LOAN,id:r.id}));
+      newItems.forEach(it=>pendAdd({op:'upsert',table:T_ITEM,id:it.id,row:rowOf(it)}));
+      newLoans.forEach(l=>pendAdd({op:'upsert',table:T_LOAN,id:l.id,row:loanRowOf(l)}));
     }
     state.items=newItems; state.loans=newLoans; localSave();
+    if(state.mode==='cloud' && state.sb) flushPending();
     if(data.cfg){ state.cfg=Object.assign({url:'',key:''},data.cfg); saveCfg(); }
     if(data.me){ state.me=data.me; try{ localStorage.setItem(LS_ME,JSON.stringify(state.me)); }catch(e){} }
     if(data.tab){ state.tab=data.tab; try{ localStorage.setItem(LS_TAB,state.tab); }catch(e){} }
@@ -1694,9 +1778,9 @@ function boot(){
   state.mode = (state.cfg.url&&state.cfg.key) ? 'cloud' : 'local';
   if(state.mode==='local'){ localLoad(); renderAll(); }
   connectCloud();
-  // 定时只刷新「随时间会变」的轻量内容（到期状态、预警跑马灯）。
+  // 定时只刷新「随时间会变」的轻量内容（到期状态、预警跑马灯），顺带补传没同步成功的修改。
   // 待归还清单只随借/还变化，而借还必然触发 renderAll，无需在此重绘（省掉一次全表 DOM 重建）。
-  setInterval(()=>{ renderAlert(); renderWarnTicker(); }, 30000);
+  setInterval(()=>{ renderAlert(); renderWarnTicker(); flushPending(); }, 30000);
 }
 boot();
 </script>
