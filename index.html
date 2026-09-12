@@ -518,7 +518,20 @@ drop policy if exists crm_loans_all on crm_loans;
 create policy crm_loans_all on crm_loans for all using (true) with check (true);
 
 do $$ begin alter publication supabase_realtime add table crm_items; exception when others then null; end $$;
-do $$ begin alter publication supabase_realtime add table crm_loans; exception when others then null; end $$;`;
+do $$ begin alter publication supabase_realtime add table crm_loans; exception when others then null; end $$;
+
+-- 库存原子加减（多人同时领用/归还同一条也不丢账）
+-- p_id: 台账条目 id；p_qty_delta: 库存变化量（领用为负、归还为正，可为 0）
+-- p_amount: 归还时的新余量百分比（绝对值，可为 NULL 表示不动余量）
+create or replace function crm_return_stock(p_id text, p_qty_delta numeric, p_amount numeric)
+returns void
+language sql
+as $$
+  update crm_items
+  set qty    = greatest(0, coalesce(qty,0) + coalesce(p_qty_delta,0)),
+      amount = coalesce(p_amount, amount)
+  where id = p_id;
+$$;`;
 
 const DEMO = [
   { type:'material', code:'CRM-001', name:'水中铅成分分析标准物质', gbwno:'GBW(E)080215', batch:'240315', spec:'20 mL 安瓿', value:'100 μg/mL', uncert:'1%', expiry:'2027-03-14', location:'标物柜 A-2', qty:5, need_return:false, note:'避光冷藏' },
@@ -706,7 +719,7 @@ function pendDelIf(table,id,seq){ pendSave(pendLoad().filter(o=>!(o.table===tabl
 function pendHas(table,id){ return pendLoad().some(o=>o.table===table&&o.id===id); }
 async function push(it){
   if(state.mode==='local'){ localSave(); return {error:null}; }
-  if(!state.sb) return {error:{message:'未连接云端'}};
+  if(!state.sb){ pendAdd({op:'upsert',table:T_ITEM,id:it.id,row:rowOf(it)}); return {error:null}; }
   const row=rowOf(it);
   const seq=pendAdd({op:'upsert',table:T_ITEM,id:it.id,row});
   let last=null;
@@ -719,7 +732,7 @@ async function push(it){
 }
 async function pushLoan(l){
   if(state.mode==='local'){ localSave(); return {error:null}; }
-  if(!state.sb) return {error:{message:'未连接云端'}};
+  if(!state.sb){ pendAdd({op:'upsert',table:T_LOAN,id:l.id,row:loanRowOf(l)}); return {error:null}; }
   const row=loanRowOf(l);
   const seq=pendAdd({op:'upsert',table:T_LOAN,id:l.id,row});
   let last=null;
@@ -732,10 +745,28 @@ async function pushLoan(l){
 }
 async function dropRow(t,id){
   if(state.mode==='local'){ localSave(); return {error:null}; }
-  if(!state.sb) return {error:{message:'未连接云端'}};
+  if(!state.sb){
+    // 未连上云端也先把整行排队，联网后 flushPending 补传，绝不丢
+    const it=state.items.find(x=>x.id===id);
+    if(it) pendAdd({op:'upsert',table:T_ITEM,id,row:rowOf(it)});
+    return {error:null};
+  }
   const seq=pendAdd({op:'delete',table:t,id});
   try{ const {error}=await state.sb.from(t).delete().eq('id',id); if(!error){ pendDelIf(t,id,seq); return {error:null}; } return {error}; }
   catch(e){ return {error:e}; }
+}
+/* 库存原子加减：多人同时领用/归还同一条也不丢账（由数据库单条 UPDATE 保证）。
+   dqty：库存变化量（领用为负、归还需归还物质为 +1）；amount：归还时的绝对余量 %，null 表示不动。
+   若数据库函数还没建或调用失败 → 自动退回整行写入（幂等，旧版行为，不会重复扣减）。 */
+async function stockDelta(id, dqty, amount){
+  const it=findItem(id); if(!it) return {error:null};
+  if(state.mode==='local'){ localSave(); return {error:null}; }
+  if(!state.sb){ pendAdd({op:'upsert',table:T_ITEM,id,row:rowOf(it)}); return {error:null}; }
+  try{
+    const {error}=await state.sb.rpc('crm_return_stock',{ p_id:id, p_qty_delta:dqty, p_amount:(amount===null||amount===undefined)?null:amount });
+    if(!error) return {error:null};
+    return await push(it);
+  }catch(e){ return await push(it); }
 }
 /* 把队列里积压的操作批量补传云端（删除按 id 批量、写入按 200 条分块） */
 async function flushPending(){
@@ -1206,7 +1237,7 @@ function makeLoan(it, who, qty, remark){
   const loan={ id:uid(), item_id:it.id, code:it.code, name:it.name, batch:it.batch||'',
     item_type:it.type, kind:consume?'consume':'borrow', borrower:who, borrow_at:now,
     remark:remark||'', qty:consume?qty:1, return_at:consume?now:null, remain:null, return_note:'' };
-  if(consume){ it.qty=Number(it.qty)-qty; push(it); }
+  if(consume){ it.qty=Number(it.qty)-qty; stockDelta(it.id, -qty, null); }
   pushLoan(loan);
   toast(consume ? `已领用 ${it.code} ×${qty}，剩余库存 ${it.qty}` : `已借出 ${it.code} → ${who}`);
   return loan;
@@ -1417,11 +1448,12 @@ function confirmReturn(){
   l.return_at=new Date().toISOString(); l.remain=remain;
   l.return_note=($('#r_note').value||'').trim();
   pushLoan(l);
-  // 同一行的多处变更合并为一次推送：旧实现连发两次 upsert，可能在服务器乱序落地，把库存+1 冲掉
-  if(it){
+  // 库存/余量走数据库原子加减：多人同一秒归还同一条也不丢账
+  const addQty = (l.item_type==='material' && it.need_return) ? 1 : 0;
+  if(it && (remain!==null || addQty)){
     if(remain!==null) it.amount=remain;
-    if(l.item_type==='material' && it.need_return) it.qty = Number(it.qty||0) + 1;
-    push(it);
+    if(addQty) it.qty = Number(it.qty||0) + 1;
+    stockDelta(it.id, addQty, remain!==null?remain:null);
   }
   $('#returnDlg').close(); renderAll();
   toast(`已归还：${l.code}${remain!==null?'，余量 '+remain+'%':''}`);
